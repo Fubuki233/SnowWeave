@@ -765,6 +765,5 @@ if __name__ == "__main__":
         show_error=True,
         max_file_size=args.max_file_size,
         allowed_paths=[OUTPUT_DIR],
-        root_path=args.root_path,
-        show_api=False
+        root_path=args.root_path
     )
