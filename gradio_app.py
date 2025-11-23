@@ -474,10 +474,10 @@ Effects: NONE
         return None, None, None, None, f"❌ 错误: {str(e)}"
 
 # 创建Gradio界面
-with gr.Blocks(title="Sprite动画生成流水线") as app:
+with gr.Blocks(title="Snow Wave") as app:
     gr.Markdown("""
-    # 🎬 Sprite动画生成流水线
-    ### AI驱动的游戏动画自动化生成工具
+    # 🎬Snow Wave 
+    ### sprite动画生成流水线
     """)
     
     with gr.Tabs():
@@ -512,6 +512,8 @@ with gr.Blocks(title="Sprite动画生成流水线") as app:
             gr.Markdown("""
             ---
             ### 💡 提示
+            - 当前已经自动填充了密钥,点击验证即可
+            - 如果想加自己的密钥,直接替换上面的内容即可
             - API密钥会在当前会话中保存，关闭浏览器后需重新输入
             - 视频生成功能需要API密钥，其他功能（提取帧、去背景）无需密钥
             - 获取密钥后，点击"保存并验证"即可使用
