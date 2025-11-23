@@ -15,12 +15,12 @@ from datetime import datetime
 from PIL import Image
 import tempfile
 import shutil
+from google import genai
 
 # 导入流水线功能
 from generate_sprite_animation import (
     load_reference_image,
-    generate_animation_video,
-    client as gemini_client
+    generate_animation_video
 )
 from extract_sprite_frames import (
     extract_frames_from_video_segment,
@@ -37,8 +37,46 @@ from remove_background import (
 OUTPUT_DIR = "gradio_outputs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-def generate_video_ui(image, action):
+# 全局API客户端和密钥
+gemini_client = None
+current_api_key = ""
+
+# 可用模型列表
+AVAILABLE_MODELS = {
+    "veo-3.1-generate-preview": "Veo 3.1 (预览版，最新)",
+    "veo-3.1-fast-generate-preview": "Veo 3.1 Fast (预览版，快速)",
+    "veo-3.0-generate-001": "Veo 3.0 (稳定版)",
+    "veo-3.0-fast-generate-001": "Veo 3.0 Fast (稳定版，快速)",
+    "veo-2.0-generate-001": "Veo 2.0 (旧版)",
+}
+DEFAULT_MODEL = "veo-2.0-generate-001"
+current_model = DEFAULT_MODEL
+
+def initialize_api(api_key):
+    """初始化Gemini API客户端"""
+    global gemini_client, current_api_key
+    try:
+        gemini_client = genai.Client(api_key=api_key)
+        current_api_key = api_key
+        return "✅ API密钥验证成功！"
+    except Exception as e:
+        return f"❌ API密钥验证失败: {str(e)}"
+
+def get_current_api_key():
+    """获取当前保存的API密钥"""
+    return current_api_key
+
+def set_model(model_name):
+    """设置当前使用的模型"""
+    global current_model
+    current_model = model_name
+    return f"✅ 已切换到模型: {AVAILABLE_MODELS.get(model_name, model_name)}"
+
+def generate_video_ui(image, action, model_name):
     """生成动画视频"""
+    if gemini_client is None:
+        return None, "❌ 请先在设置中配置API密钥"
+    
     if image is None:
         return None, "请先上传图片"
     
@@ -56,7 +94,14 @@ def generate_video_ui(image, action):
         
         # 构建提示词
         full_prompt = f"""
-Create a smooth sprite animation of the character {action} IN PLACE (not moving across screen).
+Create a smooth sprite animation of a STYLIZED, NON-REALISTIC game character performing {action} IN PLACE.
+
+IMPORTANT - CHARACTER STYLE:
+- This is a FICTIONAL GAME CHARACTER, not a real person
+- Use CARTOON/PIXEL ART style with simplified features
+- ABSTRACT or STYLIZED representation only
+- NO photorealistic human features
+- Game sprite aesthetic (像素/卡通风格游戏角色)
 
 CRITICAL REQUIREMENTS:
 - START IMMEDIATELY with the character visible - NO fade in effect
@@ -82,21 +127,48 @@ Effects: NONE - no physics, lighting, or post-processing effects
 """
         
         # 生成视频
-        video = generate_animation_video(reference_image, full_prompt)
+        video = generate_animation_video(reference_image, full_prompt, gemini_client, model_name)
+        
+        if video is None:
+            yield None, "❌ 视频生成失败: API 返回空结果"
+            return
         
         yield None, "📥 正在下载视频..."
         
-        # 保存视频
+        # 保存视频和参考图片
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_path = os.path.join(OUTPUT_DIR, f"video_{timestamp}.mp4")
+        output_dir = os.path.join(OUTPUT_DIR, f"video_{timestamp}")
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # 保存视频
+        output_path = os.path.join(output_dir, "animation.mp4")
         video_data = gemini_client.files.download(file=video.video)
         with open(output_path, "wb") as f:
             f.write(video_data)
         
+        # 保存参考图片
+        reference_path = os.path.join(output_dir, "reference_image.png")
+        reference_image.save(reference_path)
+        
+        # 保存元数据
+        metadata_path = os.path.join(output_dir, "metadata.txt")
+        with open(metadata_path, "w", encoding="utf-8") as f:
+            f.write(f"生成时间: {timestamp}\n")
+            f.write(f"动作描述: {action}\n")
+            f.write(f"使用模型: {model_name}\n")
+            f.write(f"视频文件: animation.mp4\n")
+            f.write(f"参考图片: reference_image.png\n")
+        
         # 清理临时文件
         os.remove(temp_img_path)
         
-        yield output_path, f"✅ 视频生成完成!\n保存路径: {output_path}"
+        yield output_path, f"""✅ 视频生成完成!
+
+📁 输出目录: {output_dir}
+📹 视频文件: {output_path}
+🖼️ 参考图片: {reference_path}
+📝 元数据: {metadata_path}
+"""
         
     except Exception as e:
         yield None, f"❌ 错误: {str(e)}"
@@ -208,8 +280,11 @@ def remove_background_ui(input_path, tolerance, auto_crop, crop_padding, progres
     except Exception as e:
         return None, None, f"❌ 错误: {str(e)}"
 
-def full_pipeline_ui(image, action, start_time, end_time, max_frames, tolerance, auto_crop, crop_padding, progress=gr.Progress()):
+def full_pipeline_ui(image, action, start_time, end_time, max_frames, tolerance, auto_crop, crop_padding, model_name, progress=gr.Progress()):
     """完整流水线"""
+    if gemini_client is None:
+        return None, None, "❌ 请先在设置中配置API密钥"
+    
     if image is None:
         return None, None, None, "请先上传图片"
     
@@ -223,7 +298,14 @@ def full_pipeline_ui(image, action, start_time, end_time, max_frames, tolerance,
         reference_image = load_reference_image(temp_img_path)
         
         full_prompt = f"""
-Create a smooth sprite animation of the character {action} IN PLACE (not moving across screen).
+Create a smooth sprite animation of a STYLIZED, NON-REALISTIC game character performing {action} IN PLACE.
+
+IMPORTANT - CHARACTER STYLE:
+- This is a FICTIONAL GAME CHARACTER, not a real person
+- Use CARTOON/PIXEL ART style with simplified features
+- ABSTRACT or STYLIZED representation only
+- NO photorealistic human features
+- Game sprite aesthetic (像素/卡通风格游戏角色)
 
 CRITICAL REQUIREMENTS:
 - START IMMEDIATELY with the character visible - NO fade in effect
@@ -248,16 +330,46 @@ Background: Pure chroma green (#00FF00) for entire duration
 Effects: NONE
 """
         
-        video = generate_animation_video(reference_image, full_prompt)
+        video = generate_animation_video(reference_image, full_prompt, gemini_client, model_name)
+        
+        if video is None:
+            return None, None, "❌ 视频生成失败: API 返回空结果"
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_base = os.path.join(OUTPUT_DIR, f"full_{timestamp}")
         os.makedirs(output_base, exist_ok=True)
         
+        # 保存视频
         video_path = os.path.join(output_base, "animation.mp4")
         video_data = gemini_client.files.download(file=video.video)
         with open(video_path, "wb") as f:
             f.write(video_data)
+        
+        # 保存参考图片
+        reference_path = os.path.join(output_base, "reference_image.png")
+        reference_image.save(reference_path)
+        
+        # 保存元数据
+        metadata_path = os.path.join(output_base, "metadata.txt")
+        with open(metadata_path, "w", encoding="utf-8") as f:
+            f.write(f"=== SnowWeave 完整流程输出 ===\n\n")
+            f.write(f"生成时间: {timestamp}\n")
+            f.write(f"动作描述: {action}\n")
+            f.write(f"使用模型: {model_name}\n\n")
+            f.write(f"=== 视频生成参数 ===\n")
+            f.write(f"提取时间范围: {start_time}s - {end_time}s\n")
+            f.write(f"最大帧数: {max_frames}\n\n")
+            f.write(f"=== 背景去除参数 ===\n")
+            f.write(f"颜色容差: {tolerance}\n")
+            f.write(f"自动裁剪: {auto_crop}\n")
+            f.write(f"裁剪边距: {crop_padding}px\n\n")
+            f.write(f"=== 输出文件 ===\n")
+            f.write(f"视频: animation.mp4\n")
+            f.write(f"参考图片: reference_image.png\n")
+            f.write(f"原始提取帧: 1_extracted_frames/\n")
+            f.write(f"去背景帧: 2_nobg_frames/\n")
+            f.write(f"原始Sprite Sheet: 1_original_sprite_sheet.png\n")
+            f.write(f"最终Sprite Sheet: 3_final_sprite_sheet.png\n")
         
         os.remove(temp_img_path)
         
@@ -310,6 +422,9 @@ Effects: NONE
 📁 输出目录: {output_base}
 
 生成的文件:
+  📹 视频文件: {video_path}
+  🖼️ 参考图片: {reference_path}
+  📝 元数据文件: {metadata_path}
   1️⃣ 原始提取帧: {frames_dir}/ ({len(frames)} 帧)
   2️⃣ 去背景帧: {nobg_dir}/ ({len(final_frames)} 帧)
   3️⃣ 原始Sprite Sheet: {original_sheet_path}
@@ -332,6 +447,42 @@ with gr.Blocks(title="Sprite动画生成流水线") as app:
     """)
     
     with gr.Tabs():
+        # Tab 0: API设置
+        with gr.Tab("⚙️ 设置"):
+            gr.Markdown("""
+            ### 配置Gemini API密钥
+            在使用视频生成功能前，需要先配置API密钥。
+            
+            获取API密钥: [Google AI Studio](https://aistudio.google.com/apikey)
+            """)
+            
+            with gr.Row():
+                with gr.Column():
+                    api_key_input = gr.Textbox(
+                        label="Gemini API密钥",
+                        type="password",
+                        placeholder="输入你的API密钥",
+                        value=""
+                    )
+                    api_set_btn = gr.Button("💾 保存并验证", variant="primary", size="lg")
+                
+                with gr.Column():
+                    api_status = gr.Textbox(label="状态", lines=3, interactive=False)
+            
+            api_set_btn.click(
+                fn=lambda api_key: "❌ 请输入API密钥" if not api_key else initialize_api(api_key),
+                inputs=[api_key_input],
+                outputs=[api_status]
+            )
+            
+            gr.Markdown("""
+            ---
+            ### 💡 提示
+            - API密钥会在当前会话中保存，关闭浏览器后需重新输入
+            - 视频生成功能需要API密钥，其他功能（提取帧、去背景）无需密钥
+            - 获取密钥后，点击"保存并验证"即可使用
+            """)
+        
         # Tab 1: 生成视频
         with gr.Tab("🎨 生成视频"):
             gr.Markdown("""
@@ -347,7 +498,13 @@ with gr.Blocks(title="Sprite动画生成流水线") as app:
                     gen_action = gr.Textbox(
                         label="动作描述",
                         placeholder="例如: walking, running, attack, jump",
-                        value="walking animation"
+                        value="walking animation, side view, loop"
+                    )
+                    gen_model = gr.Dropdown(
+                        label="选择模型",
+                        choices=list(AVAILABLE_MODELS.keys()),
+                        value=DEFAULT_MODEL,
+                        info="不同模型可能有不同的质量和安全策略"
                     )
                     gen_btn = gr.Button("🎬 生成动画视频", variant="primary", size="lg")
                 
@@ -357,7 +514,7 @@ with gr.Blocks(title="Sprite动画生成流水线") as app:
             
             gen_btn.click(
                 fn=generate_video_ui,
-                inputs=[gen_image, gen_action],
+                inputs=[gen_image, gen_action, gen_model],
                 outputs=[gen_video_output, gen_status]
             )
         
@@ -503,6 +660,14 @@ with gr.Blocks(title="Sprite动画生成流水线") as app:
                         step=1
                     )
                     
+                    gr.Markdown("#### 模型选择")
+                    full_model = gr.Dropdown(
+                        label="视频生成模型",
+                        choices=list(AVAILABLE_MODELS.keys()),
+                        value=DEFAULT_MODEL,
+                        info="选择不同的Veo模型"
+                    )
+                    
                     full_btn = gr.Button("🚀 开始完整流程", variant="primary", size="lg")
                 
                 with gr.Column():
@@ -514,7 +679,7 @@ with gr.Blocks(title="Sprite动画生成流水线") as app:
                 fn=full_pipeline_ui,
                 inputs=[
                     full_image, full_action, full_start, full_end, full_max_frames,
-                    full_tolerance, full_auto_crop, full_padding
+                    full_tolerance, full_auto_crop, full_padding, full_model
                 ],
                 outputs=[full_sheet_output, full_gallery, full_status]
             )

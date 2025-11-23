@@ -15,18 +15,18 @@ import time
 import base64
 from io import BytesIO
 from google import genai
-from google.genai.types import Part, Image as GenAIImage, GenerateVideosConfig
+from google.genai.types import Part, Image as GenAIImage, GenerateVideosConfig, HarmCategory, HarmBlockThreshold
 from PIL import Image
 import cv2
 import numpy as np
 
-# 配置 API 密钥
-api_key = os.environ.get("GEMINI_API_KEY", "AIzaSyAYEeSNAB9ikYV4GoTK-5CM51yE5ljAQYs")
-if not api_key:
-    raise ValueError("请设置环境变量 GEMINI_API_KEY")
+# 配置 API 密钥（可选，如果不通过参数传入）
+api_key = "AIzaSyBhrZZhFDdKbI4uvA_xh6HscNi2p3FYEpc"
 
-# 创建客户端
-client = genai.Client(api_key=api_key)
+# 创建默认客户端（如果有环境变量）
+client = None
+if api_key:
+    client = genai.Client(api_key=api_key)
 
 def load_reference_image(image_path):
     """加载参考图片"""
@@ -37,9 +37,15 @@ def load_reference_image(image_path):
     img = Image.open(image_path)
     return img
 
-def generate_animation_video(reference_image, action_prompt):
-    """使用 Veo 3.1 生成动画视频"""
+def generate_animation_video(reference_image, action_prompt, api_client=None, model_name="veo-2.0-generate-001"):
+    """使用 Veo 生成动画视频"""
+    # 使用传入的 client 或全局 client
+    _client = api_client or client
+    if _client is None:
+        raise ValueError("未提供 API 客户端，请传入 api_client 参数或设置环境变量 GEMINI_API_KEY")
+    
     print(f"正在生成动画: {action_prompt}")
+    print(f"使用模型: {model_name}")
     
     # 将 PIL Image 转换为字节流并编码为base64
     img_bytes = BytesIO()
@@ -54,25 +60,87 @@ def generate_animation_video(reference_image, action_prompt):
         mime_type='image/png'
     )
     
-    # 使用 Veo 3.1 生成视频，限制时长为4秒（最短）
+    # 使用 Veo 生成视频
     print("开始生成视频 (4秒时长)...")
-    operation = client.models.generate_videos(
-        model="veo-2.0-generate-001",
-        prompt=action_prompt,
-        image=veo_image,
-        config=GenerateVideosConfig(
-            duration_seconds=5  # 最短时长为4秒
+    
+    # 尝试设置最宽松的安全设置
+    try:
+        operation = _client.models.generate_videos(
+            model=model_name,
+            prompt=action_prompt,
+            image=veo_image,
+            config=GenerateVideosConfig(
+                duration_seconds=5,  # 最短时长为4秒
+                safety_settings=[
+                    {
+                        "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                        "threshold": "BLOCK_NONE"
+                    },
+                    {
+                        "category": "HARM_CATEGORY_HARASSMENT", 
+                        "threshold": "BLOCK_NONE"
+                    },
+                    {
+                        "category": "HARM_CATEGORY_HATE_SPEECH",
+                        "threshold": "BLOCK_NONE"
+                    },
+                    {
+                        "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                        "threshold": "BLOCK_NONE"
+                    }
+                ]
+            )
         )
-    )
+        print("   (已设置宽松安全过滤)")
+    except Exception as e:
+        # 如果不支持 safety_settings，则使用默认配置
+        print(f"   (注意: 安全设置不被支持，使用默认配置)")
+        operation = _client.models.generate_videos(
+            model=model_name,
+            prompt=action_prompt,
+            image=veo_image,
+            config=GenerateVideosConfig(
+                duration_seconds=5
+            )
+        )
     
     # 轮询操作状态直到视频准备好
     print("等待视频生成完成...")
     while not operation.done:
         print(".", end="", flush=True)
         time.sleep(10)
-        operation = client.operations.get(operation)
+        operation = _client.operations.get(operation)
     
     print("\n✓ 视频生成完成!")
+    
+    # 检查是否有错误
+    if operation.error:
+        error_msg = f"API 错误 (代码 {operation.error.get('code')}): {operation.error.get('message')}"
+        print(f"\n❌ {error_msg}")
+        
+        # 特殊提示
+        if operation.error.get('code') == 3:
+            print("\n💡 提示: 这是安全设置问题。可能的原因:")
+            print("   - 图片包含人物面部，触发了安全过滤")
+            print("   - 建议使用非人物角色（动物、机器人、抽象角色等）")
+            print("   - 或使用简化的、卡通化的人物图像")
+        
+        raise RuntimeError(error_msg)
+    
+    # 检查操作是否成功
+    if operation.response is None:
+        print(f"ERROR: operation.response 为 None，但没有 error 信息")
+        raise RuntimeError(f"视频生成失败: operation.response 为 None（原因未知）")
+    
+    if not hasattr(operation.response, 'generated_videos'):
+        print(f"ERROR: response 没有 generated_videos 属性")
+        raise RuntimeError(f"视频生成失败: 未找到 generated_videos 属性")
+    
+    if not operation.response.generated_videos:
+        print(f"ERROR: generated_videos 为空")
+        raise RuntimeError(f"视频生成失败: generated_videos 为空列表")
+    
+    print(f"✓ 成功获取 {len(operation.response.generated_videos)} 个视频")
     return operation.response.generated_videos[0]
 
 def extract_frames_from_video(video_path, num_frames=8):
@@ -195,7 +263,9 @@ Effects: NONE - no physics, lighting, or post-processing effects
 """
         
         # 3. 生成动画视频
-        video = generate_animation_video(reference_image, full_prompt)
+        if client is None:
+            raise ValueError("未设置 GEMINI_API_KEY 环境变量")
+        video = generate_animation_video(reference_image, full_prompt, client)
         
         # 4. 下载视频
         temp_video_path = "temp_animation.mp4"
