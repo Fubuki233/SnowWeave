@@ -37,7 +37,7 @@ def load_reference_image(image_path):
     img = Image.open(image_path)
     return img
 
-def generate_animation_video(reference_image, action_prompt, api_client=None, model_name="veo-2.0-generate-001"):
+def generate_animation_video(reference_image, action_prompt, api_client=None, model_name="veo-2.0-generate-001", duration_seconds=5):
     """使用 Veo 生成动画视频"""
     # 使用传入的 client 或全局 client
     _client = api_client or client
@@ -46,6 +46,7 @@ def generate_animation_video(reference_image, action_prompt, api_client=None, mo
     
     print(f"正在生成动画: {action_prompt}")
     print(f"使用模型: {model_name}")
+    print(f"视频长度: {duration_seconds}秒")
     
     # 将 PIL Image 转换为字节流并编码为base64
     img_bytes = BytesIO()
@@ -61,7 +62,7 @@ def generate_animation_video(reference_image, action_prompt, api_client=None, mo
     )
     
     # 使用 Veo 生成视频
-    print("开始生成视频 (4秒时长)...")
+    print(f"开始生成视频 ({duration_seconds}秒时长)...")
     
     # 尝试设置最宽松的安全设置
     try:
@@ -70,7 +71,7 @@ def generate_animation_video(reference_image, action_prompt, api_client=None, mo
             prompt=action_prompt,
             image=veo_image,
             config=GenerateVideosConfig(
-                duration_seconds=5,  # 最短时长为4秒
+                duration_seconds=duration_seconds,
                 safety_settings=[
                     {
                         "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
@@ -100,7 +101,7 @@ def generate_animation_video(reference_image, action_prompt, api_client=None, mo
             prompt=action_prompt,
             image=veo_image,
             config=GenerateVideosConfig(
-                duration_seconds=5
+                duration_seconds=duration_seconds
             )
         )
     

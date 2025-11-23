@@ -90,7 +90,7 @@ def set_model(model_name):
     current_model = model_name
     return f"✅ 已切换到模型: {AVAILABLE_MODELS.get(model_name, model_name)}"
 
-def generate_video_ui(image, action, model_name):
+def generate_video_ui(image, action, model_name, duration):
     """生成动画视频"""
     if gemini_client is None:
         return None, None, "❌ 请先在设置中配置API密钥"
@@ -148,7 +148,7 @@ Effects: NONE - no physics, lighting, or post-processing effects
 """
         
         # 生成视频
-        video = generate_animation_video(reference_image, full_prompt, gemini_client, model_name)
+        video = generate_animation_video(reference_image, full_prompt, gemini_client, model_name, duration)
         
         if video is None:
             yield None, None, "❌ 视频生成失败: API 返回空结果"
@@ -307,7 +307,7 @@ def remove_background_ui(input_path, tolerance, auto_crop, crop_padding, progres
     except Exception as e:
         return None, None, f"❌ 错误: {str(e)}"
 
-def full_pipeline_ui(image, action, start_time, end_time, max_frames, tolerance, auto_crop, crop_padding, model_name, progress=gr.Progress()):
+def full_pipeline_ui(image, action, start_time, end_time, max_frames, tolerance, auto_crop, crop_padding, model_name, duration, progress=gr.Progress()):
     """完整流水线"""
     if gemini_client is None:
         return None, None, None, None, "❌ 请先在设置中配置API密钥"
@@ -542,6 +542,14 @@ with gr.Blocks(title="Snow Wave") as app:
                         value=DEFAULT_MODEL,
                         info="不同模型可能有不同的质量和安全策略"
                     )
+                    gen_duration = gr.Slider(
+                        label="视频长度(秒)",
+                        minimum=2,
+                        maximum=10,
+                        value=5,
+                        step=1,
+                        info="视频生成的时长,建议5秒"
+                    )
                     gen_btn = gr.Button("🎬 生成动画视频", variant="primary", size="lg")
                 
                 with gr.Column():
@@ -551,7 +559,7 @@ with gr.Blocks(title="Snow Wave") as app:
             
             gen_btn.click(
                 fn=generate_video_ui,
-                inputs=[gen_image, gen_action, gen_model],
+                inputs=[gen_image, gen_action, gen_model, gen_duration],
                 outputs=[gen_video_output, gen_image_output, gen_status]
             )
         
@@ -704,6 +712,14 @@ with gr.Blocks(title="Snow Wave") as app:
                         value=DEFAULT_MODEL,
                         info="选择不同的Veo模型"
                     )
+                    full_duration = gr.Slider(
+                        label="视频长度(秒)",
+                        minimum=2,
+                        maximum=10,
+                        value=5,
+                        step=1,
+                        info="视频生成的时长,建议5秒"
+                    )
                     
                     full_btn = gr.Button("🚀 开始完整流程", variant="primary", size="lg")
                 
@@ -718,7 +734,7 @@ with gr.Blocks(title="Snow Wave") as app:
                 fn=full_pipeline_ui,
                 inputs=[
                     full_image, full_action, full_start, full_end, full_max_frames,
-                    full_tolerance, full_auto_crop, full_padding, full_model
+                    full_tolerance, full_auto_crop, full_padding, full_model, full_duration
                 ],
                 outputs=[full_video_output, full_sheet_output, full_ref_output, full_gallery, full_status]
             )
