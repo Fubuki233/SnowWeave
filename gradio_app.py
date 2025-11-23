@@ -755,6 +755,9 @@ if __name__ == "__main__":
     print("\n按 Ctrl+C 停止服务器")
     print("="*70 + "\n")
     
+    # 获取输出目录的绝对路径
+    abs_output_dir = os.path.abspath(OUTPUT_DIR)
+    
     app.queue(
         max_size=20,
         api_open=False
@@ -764,6 +767,7 @@ if __name__ == "__main__":
         share=args.share,
         show_error=True,
         max_file_size=args.max_file_size,
-        allowed_paths=[OUTPUT_DIR],
-        root_path=args.root_path
+        allowed_paths=[abs_output_dir, os.path.dirname(abs_output_dir)],
+        root_path=args.root_path,
+        file_directories=[abs_output_dir]
     )
