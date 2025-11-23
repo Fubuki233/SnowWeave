@@ -171,7 +171,7 @@ def main():
     if not os.path.exists(video_path):
         print(f"× 错误: 找不到视频文件 {video_path}")
         sys.exit(1)
-    
+     
     try:
         # 1. 提取帧
         frames = extract_frames_from_video_segment(video_path, start_time, end_time)
