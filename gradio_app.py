@@ -544,11 +544,11 @@ with gr.Blocks(title="Snow Wave") as app:
                     )
                     gen_duration = gr.Slider(
                         label="视频长度(秒)",
-                        minimum=2,
-                        maximum=10,
+                        minimum=4,
+                        maximum=8,
                         value=5,
                         step=1,
-                        info="视频生成的时长,建议5秒"
+                        info="视频生成的时长,API限制4-8秒"
                     )
                     gen_btn = gr.Button("🎬 生成动画视频", variant="primary", size="lg")
                 
@@ -714,11 +714,11 @@ with gr.Blocks(title="Snow Wave") as app:
                     )
                     full_duration = gr.Slider(
                         label="视频长度(秒)",
-                        minimum=2,
-                        maximum=10,
+                        minimum=4,
+                        maximum=8,
                         value=5,
                         step=1,
-                        info="视频生成的时长,建议5秒"
+                        info="视频生成的时长,API限制4-8秒"
                     )
                     
                     full_btn = gr.Button("🚀 开始完整流程", variant="primary", size="lg")

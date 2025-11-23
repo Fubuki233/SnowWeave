@@ -44,6 +44,13 @@ def generate_animation_video(reference_image, action_prompt, api_client=None, mo
     if _client is None:
         raise ValueError("未提供 API 客户端，请传入 api_client 参数或设置环境变量 GEMINI_API_KEY")
     
+    # 确保 duration_seconds 是整数且在有效范围内
+    duration_seconds = int(duration_seconds)
+    if duration_seconds < 4:
+        duration_seconds = 4
+    elif duration_seconds > 8:
+        duration_seconds = 8
+    
     print(f"正在生成动画: {action_prompt}")
     print(f"使用模型: {model_name}")
     print(f"视频长度: {duration_seconds}秒")
@@ -65,45 +72,16 @@ def generate_animation_video(reference_image, action_prompt, api_client=None, mo
     print(f"开始生成视频 ({duration_seconds}秒时长)...")
     
     # 尝试设置最宽松的安全设置
-    try:
-        operation = _client.models.generate_videos(
+
+    operation = _client.models.generate_videos(
             model=model_name,
             prompt=action_prompt,
             image=veo_image,
             config=GenerateVideosConfig(
                 duration_seconds=duration_seconds,
-                safety_settings=[
-                    {
-                        "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-                        "threshold": "BLOCK_NONE"
-                    },
-                    {
-                        "category": "HARM_CATEGORY_HARASSMENT", 
-                        "threshold": "BLOCK_NONE"
-                    },
-                    {
-                        "category": "HARM_CATEGORY_HATE_SPEECH",
-                        "threshold": "BLOCK_NONE"
-                    },
-                    {
-                        "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                        "threshold": "BLOCK_NONE"
-                    }
-                ]
             )
         )
-        print("   (已设置宽松安全过滤)")
-    except Exception as e:
-        # 如果不支持 safety_settings，则使用默认配置
-        print(f"   (注意: 安全设置不被支持，使用默认配置)")
-        operation = _client.models.generate_videos(
-            model=model_name,
-            prompt=action_prompt,
-            image=veo_image,
-            config=GenerateVideosConfig(
-                duration_seconds=duration_seconds
-            )
-        )
+
     
     # 轮询操作状态直到视频准备好
     print("等待视频生成完成...")
