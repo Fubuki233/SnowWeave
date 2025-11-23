@@ -22,6 +22,9 @@ from google import genai
 if sys.platform == 'win32':
     import asyncio
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    # 抑制 ConnectionResetError 警告
+    import warnings
+    warnings.filterwarnings("ignore", category=ResourceWarning)
 
 # 导入流水线功能
 from generate_sprite_animation import (
@@ -649,7 +652,7 @@ with gr.Blocks(title="Snow Wave") as app:
                         label="颜色容差",
                         minimum=0,
                         maximum=255,
-                        value=30,
+                        value=180,
                         step=1,
                         info="值越大,移除的颜色范围越广"
                     )
