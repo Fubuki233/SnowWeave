@@ -671,7 +671,7 @@ with gr.Blocks(title="Snow Wave") as app:
                         label="最大帧数",
                         minimum=1,
                         maximum=100,
-                        value=8,
+                        value=24,
                         step=1
                     )
                     
