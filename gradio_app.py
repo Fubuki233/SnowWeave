@@ -10,12 +10,18 @@ Sprite动画生成流水线 - Gradio Web界面
 
 import gradio as gr
 import os
+import sys
 import time
 from datetime import datetime
 from PIL import Image
 import tempfile
 import shutil
 from google import genai
+
+# 修复 Windows 上的 asyncio ProactorEventLoop 警告
+if sys.platform == 'win32':
+    import asyncio
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # 导入流水线功能
 from generate_sprite_animation import (
@@ -568,7 +574,7 @@ with gr.Blocks(title="Sprite动画生成流水线") as app:
                         label="最大帧数",
                         minimum=1,
                         maximum=100,
-                        value=8,
+                        value=24,
                         step=1
                     )
                     
@@ -615,7 +621,7 @@ with gr.Blocks(title="Sprite动画生成流水线") as app:
                     
                     rm_auto_crop = gr.Checkbox(
                         label="自动裁剪透明边缘",
-                        value=True
+                        value=False
                     )
                     
                     rm_padding = gr.Slider(
@@ -657,7 +663,7 @@ with gr.Blocks(title="Sprite动画生成流水线") as app:
                     gr.Markdown("#### 提取参数")
                     with gr.Row():
                         full_start = gr.Number(label="开始时间(秒)", value=0)
-                        full_end = gr.Number(label="结束时间(秒)", value=5.0)
+                        full_end = gr.Number(label="结束时间(秒)", value=1.0)
                     
                     full_max_frames = gr.Slider(
                         label="最大帧数",
@@ -678,7 +684,7 @@ with gr.Blocks(title="Sprite动画生成流水线") as app:
                     
                     full_auto_crop = gr.Checkbox(
                         label="自动裁剪",
-                        value=True
+                        value=False
                     )
                     
                     full_padding = gr.Slider(

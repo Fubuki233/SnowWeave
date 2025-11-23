@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-def extract_frames_from_video_segment(video_path, start_time=2.0, end_time=3.0, max_frames=0):
+def extract_frames_from_video_segment(video_path, start_time=0.0, end_time=1.0, max_frames=0):
     """
     从视频的指定时间段提取帧
     
@@ -150,18 +150,18 @@ def main():
         print("用法: python extract_sprite_frames.py <视频文件路径> [开始时间] [结束时间] [帧大小]")
         print("\n参数说明:")
         print("  视频文件路径: 必需，要处理的视频文件")
-        print("  开始时间: 可选，默认 2.0 秒")
-        print("  结束时间: 可选，默认 3.0 秒")
+        print("  开始时间: 可选，默认 0.0 秒")
+        print("  结束时间: 可选，默认 1.0 秒")
         print("  帧大小: 可选，默认 64")
         print("\n示例:")
         print("  python extract_sprite_frames.py temp_animation.mp4")
-        print("  python extract_sprite_frames.py temp_animation.mp4 2.0 3.0")
-        print("  python extract_sprite_frames.py temp_animation.mp4 2.0 3.0 128")
+        print("  python extract_sprite_frames.py temp_animation.mp4 0.0 1.0")
+        print("  python extract_sprite_frames.py temp_animation.mp4 0.0 2.0 128")
         sys.exit(1)
     
     video_path = sys.argv[1]
-    start_time = float(sys.argv[2]) if len(sys.argv) > 2 else 2.0
-    end_time = float(sys.argv[3]) if len(sys.argv) > 3 else 3.0
+    start_time = float(sys.argv[2]) if len(sys.argv) > 2 else 0.0
+    end_time = float(sys.argv[3]) if len(sys.argv) > 3 else 1.0
     frame_size = None  # 默认使用原图大小
     
     # 如果提供了帧大小参数，则使用指定大小
