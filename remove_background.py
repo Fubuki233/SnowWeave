@@ -49,6 +49,58 @@ def color_distance(color1, color2):
     """计算两个颜色的欧氏距离"""
     return np.sqrt(sum((c1 - c2) ** 2 for c1, c2 in zip(color1, color2)))
 
+def detect_and_remove_black_borders(image, black_threshold=30):
+    """
+    检测并移除图片左右的黑边 (保持上下完整)
+    
+    参数:
+        image: PIL Image对象
+        black_threshold: 判定为黑色的阈值 (0-255)
+    
+    返回:
+        裁剪后的PIL Image对象
+    """
+    img_array = np.array(image.convert('RGB'))
+    h, w = img_array.shape[:2]
+    
+    # 检查是否是1280x720尺寸 (允许小幅度误差)
+    if not (1270 <= w <= 1290 and 710 <= h <= 770):
+        print(f"图片尺寸 {w}x{h} 不在目标范围内，跳过黑边检测")
+        return image
+    
+    print(f"检测到目标尺寸 {w}x{h}，开始检测左右黑边...")
+    
+    # 只检测左右两侧
+    # 计算每列的平均亮度
+    col_brightness = np.mean(img_array, axis=(0, 2))
+    
+    # 找到非黑色区域的左右边界
+    non_black_cols = np.where(col_brightness > black_threshold)[0]
+    
+    if len(non_black_cols) == 0:
+        print("⚠ 警告: 整张图片都是黑色，保持原图")
+        return image
+    
+    # 计算裁剪边界 (只裁剪左右,保持上下完整)
+    left = non_black_cols[0]
+    right = non_black_cols[-1] + 1
+    
+    # 如果左右都没有黑边,保持原图
+    if left == 0 and right == w:
+        print("未检测到左右黑边，保持原图")
+        return image
+    
+    # 裁剪图片 (只裁剪左右)
+    cropped = image.crop((left, 0, right, h))
+    
+    old_size = image.size
+    new_size = cropped.size
+    
+    print(f"✓ 黑边裁剪完成: {old_size} → {new_size}")
+    print(f"  - 移除边距: 左{left}px, 右{w-right}px (保持上下完整)")
+    
+    return cropped
+
 def remove_background(image, bg_color, tolerance=30):
     """
     简化的背景移除：直接检测并删除指定颜色
@@ -183,13 +235,16 @@ def process_image(input_path, output_path=None, tolerance=30, auto_crop=True, cr
     image = Image.open(input_path)
     print(f"图片大小: {image.size}")
     
-    # 检测背景色
+    # 1. 先检测并移除黑边 (针对1280x720尺寸)
+    image = detect_and_remove_black_borders(image)
+    
+    # 2. 检测背景色
     bg_color = detect_background_color(image)
     
-    # 移除背景
+    # 3. 移除背景
     result = remove_background(image, bg_color, tolerance)
     
-    # 自动裁剪透明边缘
+    # 4. 自动裁剪透明边缘
     if auto_crop:
         result = auto_crop_transparent(result, padding=crop_padding)
     
@@ -264,7 +319,7 @@ def process_directory(input_dir, output_dir=None, tolerance=30, num_workers=None
     print(f"自动裁剪: {'开启' if auto_crop else '关闭'}")
     print(f"使用 {num_workers} 个进程并行处理\n")
     
-    # 第一步: 处理所有图片（去背景 + 裁剪）
+    # 第一步: 处理所有图片（黑边检测 + 去背景 + 裁剪）
     processed_images = []
     image_filenames = []
     
@@ -274,13 +329,16 @@ def process_directory(input_dir, output_dir=None, tolerance=30, num_workers=None
             print(f"处理: {filename}")
             image = Image.open(input_path)
             
-            # 检测背景色
+            # 1. 先检测并移除黑边 (针对1280x720尺寸)
+            image = detect_and_remove_black_borders(image)
+            
+            # 2. 检测背景色
             bg_color = detect_background_color(image)
             
-            # 移除背景
+            # 3. 移除背景
             result = remove_background(image, bg_color, tolerance)
             
-            # 自动裁剪透明边缘
+            # 4. 自动裁剪透明边缘
             if auto_crop:
                 result = auto_crop_transparent(result, padding=crop_padding)
             

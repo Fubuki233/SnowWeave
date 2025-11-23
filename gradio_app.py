@@ -55,7 +55,7 @@ AVAILABLE_MODELS = {
     "veo-3.0-fast-generate-001": "Veo 3.0 Fast (稳定版，快速)",
     "veo-2.0-generate-001": "Veo 2.0 (旧版)",
 }
-DEFAULT_MODEL = "veo-2.0-generate-001"
+DEFAULT_MODEL = "veo-3.1-generate-preview"
 current_model = DEFAULT_MODEL
 
 def clean_old_outputs(output_type="video"):
@@ -113,6 +113,9 @@ def generate_video_ui(image, action, model_name, duration):
         # 加载图片
         reference_image = load_reference_image(temp_img_path)
         
+        # 获取图片尺寸
+        img_width, img_height = reference_image.size
+        
         # 构建提示词
         full_prompt = f"""
 Create a smooth sprite animation of a STYLIZED, NON-REALISTIC game character performing {action} IN PLACE.
@@ -125,13 +128,15 @@ IMPORTANT - CHARACTER STYLE:
 - Game sprite aesthetic (像素/卡通风格游戏角色)
 
 CRITICAL REQUIREMENTS:
-- START IMMEDIATELY with the character visible - NO fade in effect
+- START IMMEDIATELY with the character visible - NO fade in effect No Irrelevant actions
 - Character STAYS IN THE CENTER, does NOT move left or right across the screen
 - Only the character's body/limbs animate, position remains FIXED
 - Smooth, fluid animation with natural motion
 - Complete {action} cycle IN PLACE
 - Keep the exact same character design, colors, and art style
 - Loop-able animation cycle
+- Video dimensions MUST match the reference image: {img_width}x{img_height} pixels
+- Maintain exact aspect ratio of {img_width}:{img_height}
 
 VISUAL STYLE REQUIREMENTS:
 - NO physics effects (no particles, debris, dust, etc.)
@@ -144,6 +149,7 @@ VISUAL STYLE REQUIREMENTS:
 Style: Clean pixel art / 2D game sprite animation with smooth motion, no effects
 Camera: Fixed, character stays in center and animates in place
 Background: Pure chroma green (#00FF00) for entire duration
+Resolution: {img_width}x{img_height} (match reference image exactly)
 Effects: NONE - no physics, lighting, or post-processing effects
 """
         
@@ -241,10 +247,10 @@ def extract_frames_ui(video, start_time, end_time, max_frames):
     except Exception as e:
         yield None, None, f"❌ 错误: {str(e)}"
 
-def remove_background_ui(input_path, tolerance, auto_crop, crop_padding, progress=gr.Progress()):
+def remove_background_ui(uploaded_files, tolerance, auto_crop, crop_padding, progress=gr.Progress()):
     """去除背景"""
-    if input_path is None:
-        return None, None, "请先提供输入"
+    if uploaded_files is None or len(uploaded_files) == 0:
+        return None, None, "请先上传图片"
     
     try:
         progress(0, desc="🎨 开始处理...")
@@ -253,46 +259,58 @@ def remove_background_ui(input_path, tolerance, auto_crop, crop_padding, progres
         output_dir = os.path.join(OUTPUT_DIR, f"nobg_{timestamp}")
         os.makedirs(output_dir, exist_ok=True)
         
-        # 判断是目录还是单个文件
-        if os.path.isdir(input_path):
-            progress(0.2, desc="📂 处理目录中的图片...")
+        # 处理上传的文件
+        if isinstance(uploaded_files, list) and len(uploaded_files) > 1:
+            # 多个文件
+            progress(0.2, desc=f"📂 处理 {len(uploaded_files)} 张图片...")
             
-            # 处理目录
             nobg_dir = os.path.join(output_dir, "frames")
-            process_directory(
-                input_path,
-                output_dir=nobg_dir,
-                tolerance=int(tolerance),
-                num_workers=None,
-                auto_crop=auto_crop,
-                crop_padding=int(crop_padding)
-            )
+            os.makedirs(nobg_dir, exist_ok=True)
+            
+            processed_images = []
+            for i, file_path in enumerate(uploaded_files):
+                progress(0.2 + 0.6 * (i / len(uploaded_files)), desc=f"处理 {i+1}/{len(uploaded_files)}...")
+                
+                filename = os.path.basename(file_path)
+                output_path = os.path.join(nobg_dir, filename)
+                
+                # 处理单张图片
+                process_image(
+                    file_path,
+                    output_path=output_path,
+                    tolerance=int(tolerance),
+                    auto_crop=auto_crop,
+                    crop_padding=int(crop_padding)
+                )
+                
+                processed_images.append(Image.open(output_path))
             
             progress(0.8, desc="📦 创建sprite sheet...")
             
             # 创建sprite sheet
-            nobg_files = sorted([f for f in os.listdir(nobg_dir) if f.endswith('.png')])
-            if nobg_files:
-                final_frames = [Image.open(os.path.join(nobg_dir, f)) for f in nobg_files]
-                final_sheet, _ = create_sprite_sheet(final_frames, frame_size=None)
+            if processed_images:
+                final_sheet, _ = create_sprite_sheet(processed_images, frame_size=None)
                 sheet_path = os.path.join(output_dir, "sprite_sheet.png")
                 final_sheet.save(sheet_path)
                 
-                preview_images = final_frames[:8]
+                preview_images = processed_images[:8]
             else:
                 sheet_path = None
                 preview_images = []
             
             progress(1.0, desc="✅ 完成!")
-            return sheet_path, preview_images, f"✅ 背景去除完成!\nSprite Sheet: {sheet_path}\n帧目录: {nobg_dir}"
+            return sheet_path, preview_images, f"✅ 背景去除完成!\n共处理 {len(uploaded_files)} 张图片\nSprite Sheet: {sheet_path}\n帧目录: {nobg_dir}"
             
         else:
+            # 单个文件
             progress(0.3, desc="🖼️ 处理单张图片...")
             
-            # 处理单个文件
-            output_path = os.path.join(output_dir, "output.png")
+            file_path = uploaded_files[0] if isinstance(uploaded_files, list) else uploaded_files
+            filename = os.path.basename(file_path)
+            output_path = os.path.join(output_dir, filename)
+            
             process_image(
-                input_path,
+                file_path,
                 output_path=output_path,
                 tolerance=int(tolerance),
                 auto_crop=auto_crop,
@@ -327,6 +345,9 @@ def full_pipeline_ui(image, action, start_time, end_time, max_frames, tolerance,
         
         reference_image = load_reference_image(temp_img_path)
         
+        # 获取图片尺寸
+        img_width, img_height = reference_image.size
+        
         full_prompt = f"""
 Create a smooth sprite animation of a STYLIZED, NON-REALISTIC game character performing {action} IN PLACE.
 
@@ -345,6 +366,8 @@ CRITICAL REQUIREMENTS:
 - Complete {action} cycle IN PLACE
 - Keep the exact same character design, colors, and art style
 - Loop-able animation cycle
+- Video dimensions MUST match the reference image: {img_width}x{img_height} pixels
+- Maintain exact aspect ratio of {img_width}:{img_height}
 
 VISUAL STYLE REQUIREMENTS:
 - NO physics effects (no particles, debris, dust, etc.)
@@ -357,10 +380,11 @@ VISUAL STYLE REQUIREMENTS:
 Style: Clean pixel art / 2D game sprite animation with smooth motion, no effects
 Camera: Fixed, character stays in center and animates in place
 Background: Pure chroma green (#00FF00) for entire duration
+Resolution: {img_width}x{img_height} (match reference image exactly)
 Effects: NONE
 """
         
-        video = generate_animation_video(reference_image, full_prompt, gemini_client, model_name)
+        video = generate_animation_video(reference_image, full_prompt, gemini_client, model_name, duration)
         
         if video is None:
             return None, None, None, None, "❌ 视频生成失败: API 返回空结果"
@@ -546,7 +570,7 @@ with gr.Blocks(title="Snow Wave") as app:
                         label="视频长度(秒)",
                         minimum=4,
                         maximum=8,
-                        value=5,
+                        value=6,
                         step=1,
                         info="视频生成的时长,API限制4-8秒"
                     )
@@ -607,17 +631,18 @@ with gr.Blocks(title="Snow Wave") as app:
         with gr.Tab("🖼️ 去除背景"):
             gr.Markdown("""
             ### 自动去除绿幕背景
-            1. 提供帧图片目录路径（或使用上一步的输出）
+            1. 上传单张图片或多张图片
             2. 调整容差和裁剪参数
             3. 自动检测并移除背景
             """)
             
             with gr.Row():
                 with gr.Column():
-                    rm_input = gr.Textbox(
-                        label="输入路径",
-                        placeholder="输入帧图片目录的完整路径",
-                        info="例如: gradio_outputs/frames_20231122_123456/frames"
+                    rm_input = gr.File(
+                        label="上传图片",
+                        file_count="multiple",
+                        file_types=["image"],
+                        type="filepath"
                     )
                     
                     rm_tolerance = gr.Slider(
@@ -670,10 +695,10 @@ with gr.Blocks(title="Snow Wave") as app:
                         value="walking animation, side view, loop"
                     )
                     
-                    gr.Markdown("#### 提取参数")
+                    gr.Markdown("#### 提取参数(都设为零则截取整个视频)")
                     with gr.Row():
                         full_start = gr.Number(label="开始时间(秒)", value=0)
-                        full_end = gr.Number(label="结束时间(秒)", value=1.0)
+                        full_end = gr.Number(label="结束时间(秒)", value=0)
                     
                     full_max_frames = gr.Slider(
                         label="最大帧数",
@@ -716,7 +741,7 @@ with gr.Blocks(title="Snow Wave") as app:
                         label="视频长度(秒)",
                         minimum=4,
                         maximum=8,
-                        value=5,
+                        value=6,
                         step=1,
                         info="视频生成的时长,API限制4-8秒"
                     )

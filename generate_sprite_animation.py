@@ -45,15 +45,22 @@ def generate_animation_video(reference_image, action_prompt, api_client=None, mo
         raise ValueError("未提供 API 客户端，请传入 api_client 参数或设置环境变量 GEMINI_API_KEY")
     
     # 确保 duration_seconds 是整数且在有效范围内
+    print(f"[DEBUG] 接收到的 duration_seconds: {duration_seconds}, 类型: {type(duration_seconds)}")
     duration_seconds = int(duration_seconds)
     if duration_seconds < 4:
         duration_seconds = 4
     elif duration_seconds > 8:
         duration_seconds = 8
+    print(f"[DEBUG] 转换后的 duration_seconds: {duration_seconds}, 类型: {type(duration_seconds)}")
+    
+    # 获取输入图片的尺寸
+    img_width, img_height = reference_image.size
+    print(f"输入图片尺寸: {img_width}x{img_height}")
     
     print(f"正在生成动画: {action_prompt}")
     print(f"使用模型: {model_name}")
     print(f"视频长度: {duration_seconds}秒")
+    print(f"视频尺寸: {img_width}x{img_height}")
     
     # 将 PIL Image 转换为字节流并编码为base64
     img_bytes = BytesIO()
@@ -70,6 +77,7 @@ def generate_animation_video(reference_image, action_prompt, api_client=None, mo
     
     # 使用 Veo 生成视频
     print(f"开始生成视频 ({duration_seconds}秒时长)...")
+    print(f"注意: 输入图片尺寸为 {img_width}x{img_height}, API将自动处理尺寸")
     
     # 尝试设置最宽松的安全设置
 

@@ -15,6 +15,58 @@ import cv2
 import numpy as np
 from PIL import Image
 
+def detect_black_border_params(image, black_threshold=30):
+    """
+    只检测图片左右黑边的位置参数
+    
+    参数:
+        image: PIL Image对象
+        black_threshold: 判定为黑色的阈值 (0-255)
+    
+    返回:
+        (left, right) 裁剪参数,如果没有黑边则返回 None
+    """
+    img_array = np.array(image.convert('RGB'))
+    h, w = img_array.shape[:2]
+    
+    # 检查是否是1280x720尺寸 (允许小幅度误差)
+    if not (1270 <= w <= 1290 and 710 <= h <= 770):
+        return None
+    
+    # 只检测左右两侧的黑边
+    # 计算每列的平均亮度
+    col_brightness = np.mean(img_array, axis=(0, 2))
+    
+    # 找到非黑色区域的左右边界
+    non_black_cols = np.where(col_brightness > black_threshold)[0]
+    
+    if len(non_black_cols) == 0:
+        return None
+    
+    left = non_black_cols[0]
+    right = non_black_cols[-1] + 1
+    
+    # 如果左右都没有黑边,返回None
+    if left == 0 and right == w:
+        return None
+    
+    return (left, right)
+
+def apply_crop(image, left, right):
+    """
+    应用裁剪参数,只裁剪左右,保持上下完整
+    
+    参数:
+        image: PIL Image对象
+        left: 左边界
+        right: 右边界
+    
+    返回:
+        裁剪后的PIL Image对象
+    """
+    h, w = image.size[1], image.size[0]
+    return image.crop((left, 0, right, h))
+
 def extract_frames_from_video_segment(video_path, start_time=0.0, end_time=1.0, max_frames=0):
     """
     从视频的指定时间段提取帧
@@ -86,7 +138,26 @@ def extract_frames_from_video_segment(video_path, start_time=0.0, end_time=1.0, 
     frame_indices = list(range(start_frame, end_frame, frame_interval))[:actual_max_frames]
     print(f"将提取 {len(frame_indices)} 帧")
     
-    # 提取帧
+    # 第一步: 提取第一帧并检测黑边参数
+    print("\n检测黑边...")
+    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_indices[0])
+    ret, first_frame = cap.read()
+    if not ret:
+        cap.release()
+        raise ValueError("无法读取第一帧")
+    
+    first_frame_rgb = cv2.cvtColor(first_frame, cv2.COLOR_BGR2RGB)
+    first_pil = Image.fromarray(first_frame_rgb)
+    crop_params = detect_black_border_params(first_pil)
+    
+    if crop_params:
+        left, right = crop_params
+        print(f"  - 检测到左右黑边: 左{left}px, 右{first_pil.width - right}px")
+        print(f"  - 裁剪后宽度: {right - left}px (原始: {first_pil.width}px)")
+    else:
+        print(f"  - 未检测到黑边,保持原始尺寸")
+    
+    # 第二步: 提取所有帧并应用相同的裁剪参数
     frames = []
     for idx in frame_indices:
         cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
@@ -94,10 +165,20 @@ def extract_frames_from_video_segment(video_path, start_time=0.0, end_time=1.0, 
         if ret:
             # 转换 BGR 到 RGB
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frames.append(Image.fromarray(frame_rgb))
+            pil_frame = Image.fromarray(frame_rgb)
+            
+            # 应用裁剪参数 (如果有)
+            if crop_params:
+                left, right = crop_params
+                pil_frame = apply_crop(pil_frame, left, right)
+            
+            frames.append(pil_frame)
             print(f"  ✓ 提取帧 {idx} (时间: {idx/fps:.2f}s)")
         else:
             print(f"  × 无法读取帧 {idx}")
+    
+    if frames:
+        print(f"  - 最终帧尺寸: {frames[0].size}")
     
     cap.release()
     print(f"\n✓ 成功提取了 {len(frames)} 帧")
