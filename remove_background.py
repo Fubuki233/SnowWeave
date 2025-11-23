@@ -127,6 +127,43 @@ def auto_crop_transparent(image, padding=0):
     
     return cropped
 
+def normalize_width(images, target_width=None):
+    """
+    统一所有图片的宽度为最宽图片的宽度
+    
+    参数:
+        images: PIL Image对象列表
+        target_width: 目标宽度，如果为None则使用最宽图片的宽度
+    
+    返回:
+        处理后的PIL Image对象列表
+    """
+    if not images:
+        return images
+    
+    # 找到最宽的图片
+    if target_width is None:
+        target_width = max(img.width for img in images)
+    
+    print(f"统一宽度至: {target_width}px")
+    
+    normalized = []
+    for img in images:
+        if img.width < target_width:
+            # 需要扩展宽度，居中放置
+            new_height = img.height
+            new_img = Image.new('RGBA', (target_width, new_height), (0, 0, 0, 0))
+            
+            # 计算居中位置
+            x_offset = (target_width - img.width) // 2
+            new_img.paste(img, (x_offset, 0), img if img.mode == 'RGBA' else None)
+            
+            normalized.append(new_img)
+        else:
+            normalized.append(img)
+    
+    return normalized
+
 def process_image(input_path, output_path=None, tolerance=30, auto_crop=True, crop_padding=0):
     """
     处理单张图片
@@ -227,28 +264,54 @@ def process_directory(input_dir, output_dir=None, tolerance=30, num_workers=None
     print(f"自动裁剪: {'开启' if auto_crop else '关闭'}")
     print(f"使用 {num_workers} 个进程并行处理\n")
     
-    # 准备任务列表
-    tasks = []
+    # 第一步: 处理所有图片（去背景 + 裁剪）
+    processed_images = []
+    image_filenames = []
+    
     for filename in image_files:
         input_path = os.path.join(input_dir, filename)
-        output_path = os.path.join(output_dir, filename)
-        tasks.append((input_path, output_path, tolerance, auto_crop, crop_padding))
+        try:
+            print(f"处理: {filename}")
+            image = Image.open(input_path)
+            
+            # 检测背景色
+            bg_color = detect_background_color(image)
+            
+            # 移除背景
+            result = remove_background(image, bg_color, tolerance)
+            
+            # 自动裁剪透明边缘
+            if auto_crop:
+                result = auto_crop_transparent(result, padding=crop_padding)
+            
+            processed_images.append(result)
+            image_filenames.append(filename)
+            
+        except Exception as e:
+            print(f"× 处理失败 {filename}: {e}")
     
-    # 使用多进程池处理
+    if not processed_images:
+        print("× 没有成功处理的图片")
+        return
+    
+    # 第二步: 统一宽度
+    print(f"\n统一所有图片宽度...")
+    normalized_images = normalize_width(processed_images)
+    
+    # 第三步: 保存结果
+    print(f"\n保存处理后的图片...")
     success_count = 0
     fail_count = 0
     
-    with Pool(processes=num_workers) as pool:
-        # 使用 imap 显示进度
-        results = pool.imap(process_single_image_wrapper, tasks)
-        
-        for i, (filename, success, error_msg) in enumerate(results, 1):
-            if success:
-                print(f"[{i}/{len(image_files)}] ✓ {filename}")
-                success_count += 1
-            else:
-                print(f"[{i}/{len(image_files)}] × {filename}: {error_msg}")
-                fail_count += 1
+    for filename, image in zip(image_filenames, normalized_images):
+        try:
+            output_path = os.path.join(output_dir, filename)
+            image.save(output_path)
+            print(f"✓ 已保存: {filename}")
+            success_count += 1
+        except Exception as e:
+            print(f"× 保存失败 {filename}: {e}")
+            fail_count += 1
     
     print(f"\n{'='*60}")
     print(f"批量处理完成!")

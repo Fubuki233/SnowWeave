@@ -52,6 +52,18 @@ AVAILABLE_MODELS = {
 DEFAULT_MODEL = "veo-2.0-generate-001"
 current_model = DEFAULT_MODEL
 
+def clean_old_outputs(output_type="video"):
+    """清理旧的输出文件"""
+    try:
+        pattern = f"{output_type}_*" if output_type else "*"
+        for item in os.listdir(OUTPUT_DIR):
+            item_path = os.path.join(OUTPUT_DIR, item)
+            if os.path.isdir(item_path) and item.startswith(output_type):
+                shutil.rmtree(item_path)
+                print(f"已删除旧输出: {item_path}")
+    except Exception as e:
+        print(f"清理输出时出错: {e}")
+
 def initialize_api(api_key):
     """初始化Gemini API客户端"""
     global gemini_client, current_api_key
@@ -75,13 +87,16 @@ def set_model(model_name):
 def generate_video_ui(image, action, model_name):
     """生成动画视频"""
     if gemini_client is None:
-        return None, "❌ 请先在设置中配置API密钥"
+        return None, None, "❌ 请先在设置中配置API密钥"
     
     if image is None:
-        return None, "请先上传图片"
+        return None, None, "请先上传图片"
     
     try:
-        yield None, "🎬 正在加载图片..."
+        # 清理旧的视频输出
+        clean_old_outputs("video")
+        
+        yield None, None, "🎬 正在加载图片..."
         
         # 保存临时图片
         temp_img_path = os.path.join(tempfile.gettempdir(), f"temp_{int(time.time())}.png")
@@ -130,10 +145,10 @@ Effects: NONE - no physics, lighting, or post-processing effects
         video = generate_animation_video(reference_image, full_prompt, gemini_client, model_name)
         
         if video is None:
-            yield None, "❌ 视频生成失败: API 返回空结果"
+            yield None, None, "❌ 视频生成失败: API 返回空结果"
             return
         
-        yield None, "📥 正在下载视频..."
+        yield None, None, "📥 正在下载视频..."
         
         # 保存视频和参考图片
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -162,16 +177,22 @@ Effects: NONE - no physics, lighting, or post-processing effects
         # 清理临时文件
         os.remove(temp_img_path)
         
-        yield output_path, f"""✅ 视频生成完成!
+        # 确保返回绝对路径
+        abs_video_path = os.path.abspath(output_path)
+        abs_ref_path = os.path.abspath(reference_path)
+        
+        yield abs_video_path, abs_ref_path, f"""✅ 视频生成完成!
 
 📁 输出目录: {output_dir}
-📹 视频文件: {output_path}
-🖼️ 参考图片: {reference_path}
-📝 元数据: {metadata_path}
+📹 视频文件: animation.mp4
+🖼️ 参考图片: reference_image.png
+📝 元数据: metadata.txt
+
+💾 可直接下载视频和图片
 """
         
     except Exception as e:
-        yield None, f"❌ 错误: {str(e)}"
+        yield None, None, f"❌ 错误: {str(e)}"
 
 def extract_frames_ui(video, start_time, end_time, max_frames):
     """从视频提取帧"""
@@ -283,12 +304,15 @@ def remove_background_ui(input_path, tolerance, auto_crop, crop_padding, progres
 def full_pipeline_ui(image, action, start_time, end_time, max_frames, tolerance, auto_crop, crop_padding, model_name, progress=gr.Progress()):
     """完整流水线"""
     if gemini_client is None:
-        return None, None, "❌ 请先在设置中配置API密钥"
+        return None, None, None, None, "❌ 请先在设置中配置API密钥"
     
     if image is None:
-        return None, None, None, "请先上传图片"
+        return None, None, None, None, "请先上传图片"
     
     try:
+        # 清理旧的完整流程输出
+        clean_old_outputs("full")
+        
         # 步骤1: 生成视频
         progress(0, desc="🎬 步骤1/4: 生成动画视频...")
         
@@ -333,7 +357,7 @@ Effects: NONE
         video = generate_animation_video(reference_image, full_prompt, gemini_client, model_name)
         
         if video is None:
-            return None, None, "❌ 视频生成失败: API 返回空结果"
+            return None, None, None, None, "❌ 视频生成失败: API 返回空结果"
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_base = os.path.join(OUTPUT_DIR, f"full_{timestamp}")
@@ -422,22 +446,26 @@ Effects: NONE
 📁 输出目录: {output_base}
 
 生成的文件:
-  📹 视频文件: {video_path}
-  🖼️ 参考图片: {reference_path}
-  📝 元数据文件: {metadata_path}
-  1️⃣ 原始提取帧: {frames_dir}/ ({len(frames)} 帧)
-  2️⃣ 去背景帧: {nobg_dir}/ ({len(final_frames)} 帧)
-  3️⃣ 原始Sprite Sheet: {original_sheet_path}
-  4️⃣ 最终Sprite Sheet: {final_sheet_path}
-  📹 视频文件: {video_path}
+  📹 视频文件: animation.mp4
+  🖼️ 参考图片: reference_image.png
+  📝 元数据文件: metadata.txt
+  1️⃣ 原始提取帧: 1_extracted_frames/ ({len(frames)} 帧)
+  2️⃣ 去背景帧: 2_nobg_frames/ ({len(final_frames)} 帧)
+  3️⃣ 原始Sprite Sheet: 1_original_sprite_sheet.png
+  4️⃣ 最终Sprite Sheet: 3_final_sprite_sheet.png
 
 🎮 可直接在游戏引擎中使用最终Sprite Sheet!
+💾 可下载最终Sprite Sheet和参考图片
 """
         
-        return final_sheet_path, preview_images, summary
+        abs_video_path = os.path.abspath(video_path)
+        abs_sheet_path = os.path.abspath(final_sheet_path)
+        abs_ref_path = os.path.abspath(reference_path)
+        
+        return abs_video_path, abs_sheet_path, abs_ref_path, preview_images, summary
         
     except Exception as e:
-        return None, None, f"❌ 错误: {str(e)}"
+        return None, None, None, None, f"❌ 错误: {str(e)}"
 
 # 创建Gradio界面
 with gr.Blocks(title="Sprite动画生成流水线") as app:
@@ -462,7 +490,7 @@ with gr.Blocks(title="Sprite动画生成流水线") as app:
                         label="Gemini API密钥",
                         type="password",
                         placeholder="输入你的API密钥",
-                        value=""
+                        value="AIzaSyBhrZZhFDdKbI4uvA_xh6HscNi2p3FYEpc"
                     )
                     api_set_btn = gr.Button("💾 保存并验证", variant="primary", size="lg")
                 
@@ -509,13 +537,14 @@ with gr.Blocks(title="Sprite动画生成流水线") as app:
                     gen_btn = gr.Button("🎬 生成动画视频", variant="primary", size="lg")
                 
                 with gr.Column():
-                    gen_video_output = gr.Video(label="生成的视频")
-                    gen_status = gr.Textbox(label="状态", lines=3)
+                    gen_video_output = gr.Video(label="生成的视频", autoplay=False)
+                    gen_image_output = gr.Image(label="参考图片", type="filepath")
+                    gen_status = gr.Textbox(label="状态", lines=5)
             
             gen_btn.click(
                 fn=generate_video_ui,
                 inputs=[gen_image, gen_action, gen_model],
-                outputs=[gen_video_output, gen_status]
+                outputs=[gen_video_output, gen_image_output, gen_status]
             )
         
         # Tab 2: 提取帧
@@ -622,7 +651,7 @@ with gr.Blocks(title="Sprite动画生成流水线") as app:
                     full_image = gr.Image(label="上传角色图片", type="numpy")
                     full_action = gr.Textbox(
                         label="动作描述",
-                        value="walking animation"
+                        value="walking animation, side view, loop"
                     )
                     
                     gr.Markdown("#### 提取参数")
@@ -671,7 +700,9 @@ with gr.Blocks(title="Sprite动画生成流水线") as app:
                     full_btn = gr.Button("🚀 开始完整流程", variant="primary", size="lg")
                 
                 with gr.Column():
-                    full_sheet_output = gr.Image(label="最终Sprite Sheet")
+                    full_video_output = gr.Video(label="生成的动画视频", autoplay=False)
+                    full_sheet_output = gr.Image(label="最终Sprite Sheet", type="filepath")
+                    full_ref_output = gr.Image(label="参考图片", type="filepath")
                     full_gallery = gr.Gallery(label="最终帧预览", columns=4, height="auto")
                     full_status = gr.Textbox(label="执行状态", lines=10)
             
@@ -681,7 +712,7 @@ with gr.Blocks(title="Sprite动画生成流水线") as app:
                     full_image, full_action, full_start, full_end, full_max_frames,
                     full_tolerance, full_auto_crop, full_padding, full_model
                 ],
-                outputs=[full_sheet_output, full_gallery, full_status]
+                outputs=[full_video_output, full_sheet_output, full_ref_output, full_gallery, full_status]
             )
     
     gr.Markdown("""
