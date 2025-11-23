@@ -768,6 +768,5 @@ if __name__ == "__main__":
         show_error=True,
         max_file_size=args.max_file_size,
         allowed_paths=[abs_output_dir, os.path.dirname(abs_output_dir)],
-        root_path=args.root_path,
-        file_directories=[abs_output_dir]
+        root_path=args.root_path
     )
