@@ -1,0 +1,22 @@
+=== SnowWeave 完整流程输出 ===
+
+生成时间: 20251124_014333
+动作描述: walking animation, side view, loop
+使用模型: veo-2.0-generate-001
+
+=== 视频生成参数 ===
+提取时间范围: 0s - 1s
+最大帧数: 24
+
+=== 背景去除参数 ===
+颜色容差: 30
+自动裁剪: False
+裁剪边距: 0px
+
+=== 输出文件 ===
+视频: animation.mp4
+参考图片: reference_image.png
+原始提取帧: 1_extracted_frames/
+去背景帧: 2_nobg_frames/
+原始Sprite Sheet: 1_original_sprite_sheet.png
+最终Sprite Sheet: 3_final_sprite_sheet.png

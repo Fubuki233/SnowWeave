@@ -733,17 +733,38 @@ with gr.Blocks(title="Sprite动画生成流水线") as app:
     """)
 
 if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Sprite动画生成流水线 - Gradio界面')
+    parser.add_argument('--share', action='store_true', help='创建公共分享链接(用于临时远程访问)')
+    parser.add_argument('--server-name', default='0.0.0.0', help='服务器地址(默认: 0.0.0.0)')
+    parser.add_argument('--server-port', type=int, default=7860, help='服务器端口(默认: 7860)')
+    parser.add_argument('--root-path', default=None, help='反向代理根路径(例如: /gradio)')
+    parser.add_argument('--max-file-size', default='100mb', help='最大文件上传大小(默认: 100mb)')
+    args = parser.parse_args()
+    
     print("="*70)
     print("  🎬 Sprite动画生成流水线 - Gradio界面")
     print("="*70)
     print("\n启动Gradio服务器...")
-    print("界面将在浏览器中自动打开")
+    print(f"  - 地址: {args.server_name}:{args.server_port}")
+    if args.share:
+        print("  - 模式: 公共分享 (share=True)")
+    if args.root_path:
+        print(f"  - 反向代理路径: {args.root_path}")
     print("\n按 Ctrl+C 停止服务器")
     print("="*70 + "\n")
     
-    app.queue().launch(
-        server_name="0.0.0.0",
-        server_port=7860,
-        share=False,
-        show_error=True
+    app.queue(
+        max_size=20,
+        api_open=False
+    ).launch(
+        server_name=args.server_name,
+        server_port=args.server_port,
+        share=args.share,
+        show_error=True,
+        max_file_size=args.max_file_size,
+        allowed_paths=[OUTPUT_DIR],
+        root_path=args.root_path,
+        show_api=False
     )
