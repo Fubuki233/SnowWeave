@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-def extract_frames_from_video_segment(video_path, start_time=2.0, end_time=3.0, max_frames=8):
+def extract_frames_from_video_segment(video_path, start_time=2.0, end_time=3.0, max_frames=0):
     """
     从视频的指定时间段提取帧
     
@@ -23,7 +23,7 @@ def extract_frames_from_video_segment(video_path, start_time=2.0, end_time=3.0, 
         video_path: 视频文件路径
         start_time: 开始时间（秒），设为0或-1表示从头开始
         end_time: 结束时间（秒），设为0或-1表示到结尾
-        max_frames: 最大提取帧数（默认8）
+        max_frames: 最大提取帧数（默认0表示按每秒16帧自动计算）
     
     返回:
         提取的帧列表
@@ -63,20 +63,21 @@ def extract_frames_from_video_segment(video_path, start_time=2.0, end_time=3.0, 
     # 计算可提取的帧数范围
     available_frames = end_frame - start_frame
     
-    # 自动调整提取间隔
-    # 如果请求的帧数高于 总帧数/8，则限制为 总帧数/8
-    max_possible_frames = max(1, available_frames // 8)
-    actual_max_frames = min(max_frames, max_possible_frames)
+    # 按照每秒16帧的速率提取
+    target_fps = 16  # 每秒提取16帧
+    frame_interval = max(1, int(fps / target_fps))  # 计算提取间隔
     
-    # 计算提取间隔
-    if actual_max_frames >= available_frames:
-        frame_interval = 1
-        actual_max_frames = available_frames
-    else:
+    # 计算实际可以提取的帧数
+    actual_max_frames = available_frames // frame_interval
+    
+    # 如果用户指定了max_frames且小于计算值，使用用户指定值
+    if max_frames > 0 and max_frames < actual_max_frames:
+        actual_max_frames = max_frames
         frame_interval = available_frames // actual_max_frames
     
-    print(f"  - 提取间隔: 每 {frame_interval} 帧提取一次")
-    print(f"  - 目标帧数: {max_frames}, 实际提取: {actual_max_frames}")
+    print(f"  - 原始帧率: {fps} FPS")
+    print(f"  - 提取帧率: {target_fps} FPS (每 {frame_interval} 帧提取一次)")
+    print(f"  - 目标帧数: {max_frames if max_frames > 0 else '自动'}, 实际提取: {actual_max_frames}")
     
     print(f"\n提取时间段: {start_time:.2f}s - {end_time:.2f}s")
     print(f"对应帧范围: {start_frame} - {end_frame}")
