@@ -1,13 +1,6 @@
-# SnowWeave - Sprite Animation Generation Pipeline
-# Core dependencies for the complete workflow
 
-# AI & Video Generation
 google-genai>=0.2.0
-
-# Web Interface
 gradio>=4.0.0
-
-# Image Processing
 Pillow>=10.0.0
 opencv-python>=4.8.0
 numpy>=1.24.0

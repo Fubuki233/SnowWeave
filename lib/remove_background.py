@@ -78,7 +78,7 @@ def detect_and_remove_black_borders(image, black_threshold=30):
     non_black_cols = np.where(col_brightness > black_threshold)[0]
     
     if len(non_black_cols) == 0:
-        print("⚠ 警告: 整张图片都是黑色，保持原图")
+        print("警告: 整张图片都是黑色，保持原图")
         return image
     
     # 计算裁剪边界 (只裁剪左右,保持上下完整)
@@ -307,7 +307,7 @@ def process_directory(input_dir, output_dir=None, tolerance=30, num_workers=None
                    if os.path.splitext(f)[1].lower() in image_exts]
     
     if not image_files:
-        print(f"× 在 {input_dir} 中没有找到图片文件")
+        print(f" 在 {input_dir} 中没有找到图片文件")
         return
     
     # 确定工作进程数
@@ -346,10 +346,10 @@ def process_directory(input_dir, output_dir=None, tolerance=30, num_workers=None
             image_filenames.append(filename)
             
         except Exception as e:
-            print(f"× 处理失败 {filename}: {e}")
+            print(f" 处理失败 {filename}: {e}")
     
     if not processed_images:
-        print("× 没有成功处理的图片")
+        print(" 没有成功处理的图片")
         return
     
     # 第二步: 统一宽度
@@ -368,7 +368,7 @@ def process_directory(input_dir, output_dir=None, tolerance=30, num_workers=None
             print(f"✓ 已保存: {filename}")
             success_count += 1
         except Exception as e:
-            print(f"× 保存失败 {filename}: {e}")
+            print(f" 保存失败 {filename}: {e}")
             fail_count += 1
     
     print(f"\n{'='*60}")
@@ -417,10 +417,10 @@ def main():
                 crop_padding = int(sys.argv[i + 1])
                 i += 2
             else:
-                print("× 错误: --padding 需要指定像素数")
+                print(" 错误: --padding 需要指定像素数")
                 sys.exit(1)
         elif arg.startswith('--'):
-            print(f"× 错误: 未知选项 {arg}")
+            print(f" 错误: 未知选项 {arg}")
             sys.exit(1)
         else:
             # 位置参数
@@ -440,11 +440,11 @@ def main():
             process_image(path, tolerance=tolerance, 
                          auto_crop=auto_crop, crop_padding=crop_padding)
         else:
-            print(f"× 错误: 路径不存在 {path}")
+            print(f" 错误: 路径不存在 {path}")
             sys.exit(1)
     
     except Exception as e:
-        print(f"\n× 错误: {e}")
+        print(f"\n 错误: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

@@ -1,13 +1,3 @@
-"""
-从视频中提取sprite帧
-专门用于处理生成的动画视频，提取第2-3秒的帧
-
-使用方法:
-    python extract_sprite_frames.py <视频文件路径>
-    
-示例:
-    python extract_sprite_frames.py temp_animation.mp4
-"""
 
 import os
 import sys
@@ -16,28 +6,11 @@ import numpy as np
 from PIL import Image
 
 def detect_black_border_params(image, black_threshold=30):
-    """
-    只检测图片左右黑边的位置参数
-    
-    参数:
-        image: PIL Image对象
-        black_threshold: 判定为黑色的阈值 (0-255)
-    
-    返回:
-        (left, right) 裁剪参数,如果没有黑边则返回 None
-    """
     img_array = np.array(image.convert('RGB'))
     h, w = img_array.shape[:2]
-    
-    # 检查是否是1280x720尺寸 (允许小幅度误差)
     if not (1270 <= w <= 1290 and 710 <= h <= 770):
         return None
-    
-    # 只检测左右两侧的黑边
-    # 计算每列的平均亮度
     col_brightness = np.mean(img_array, axis=(0, 2))
-    
-    # 找到非黑色区域的左右边界
     non_black_cols = np.where(col_brightness > black_threshold)[0]
     
     if len(non_black_cols) == 0:
@@ -45,41 +18,16 @@ def detect_black_border_params(image, black_threshold=30):
     
     left = non_black_cols[0]
     right = non_black_cols[-1] + 1
-    
-    # 如果左右都没有黑边,返回None
     if left == 0 and right == w:
         return None
     
     return (left, right)
 
 def apply_crop(image, left, right):
-    """
-    应用裁剪参数,只裁剪左右,保持上下完整
-    
-    参数:
-        image: PIL Image对象
-        left: 左边界
-        right: 右边界
-    
-    返回:
-        裁剪后的PIL Image对象
-    """
     h, w = image.size[1], image.size[0]
     return image.crop((left, 0, right, h))
 
 def extract_frames_from_video_segment(video_path, start_time=0.0, end_time=1.0, max_frames=0):
-    """
-    从视频的指定时间段提取帧
-    
-    参数:
-        video_path: 视频文件路径
-        start_time: 开始时间（秒），设为0或-1表示从头开始
-        end_time: 结束时间（秒），设为0或-1表示到结尾
-        max_frames: 最大提取帧数（默认0表示按每秒16帧自动计算）
-    
-    返回:
-        提取的帧列表
-    """
     print(f"正在处理视频: {video_path}")
     
     # 打开视频
@@ -105,24 +53,18 @@ def extract_frames_from_video_segment(video_path, start_time=0.0, end_time=1.0, 
         end_time = duration
         print(f"  - 模式: 解析整个视频")
     
-    # 计算时间段对应的帧范围
     start_frame = int(start_time * fps)
     end_frame = int(end_time * fps)
     
-    # 限制不超过总帧数
     end_frame = min(end_frame, total_frames)
     
-    # 计算可提取的帧数范围
     available_frames = end_frame - start_frame
     
-    # 按照每秒16帧的速率提取
-    target_fps = 16  # 每秒提取16帧
-    frame_interval = max(1, int(fps / target_fps))  # 计算提取间隔
+    target_fps = 16  
+    frame_interval = max(1, int(fps / target_fps))  
     
-    # 计算实际可以提取的帧数
     actual_max_frames = available_frames // frame_interval
     
-    # 如果用户指定了max_frames且小于计算值，使用用户指定值
     if max_frames > 0 and max_frames < actual_max_frames:
         actual_max_frames = max_frames
         frame_interval = available_frames // actual_max_frames
@@ -134,12 +76,9 @@ def extract_frames_from_video_segment(video_path, start_time=0.0, end_time=1.0, 
     print(f"\n提取时间段: {start_time:.2f}s - {end_time:.2f}s")
     print(f"对应帧范围: {start_frame} - {end_frame}")
     
-    # 生成要提取的帧索引
     frame_indices = list(range(start_frame, end_frame, frame_interval))[:actual_max_frames]
     print(f"将提取 {len(frame_indices)} 帧")
     
-    # 第一步: 提取第一帧并检测黑边参数
-    print("\n检测黑边...")
     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_indices[0])
     ret, first_frame = cap.read()
     if not ret:
@@ -156,32 +95,28 @@ def extract_frames_from_video_segment(video_path, start_time=0.0, end_time=1.0, 
         print(f"  - 裁剪后宽度: {right - left}px (原始: {first_pil.width}px)")
     else:
         print(f"  - 未检测到黑边,保持原始尺寸")
-    
-    # 第二步: 提取所有帧并应用相同的裁剪参数
     frames = []
     for idx in frame_indices:
         cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
         ret, frame = cap.read()
         if ret:
-            # 转换 BGR 到 RGB
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             pil_frame = Image.fromarray(frame_rgb)
             
-            # 应用裁剪参数 (如果有)
             if crop_params:
                 left, right = crop_params
                 pil_frame = apply_crop(pil_frame, left, right)
             
             frames.append(pil_frame)
-            print(f"  ✓ 提取帧 {idx} (时间: {idx/fps:.2f}s)")
+            print(f"   提取帧 {idx} (时间: {idx/fps:.2f}s)")
         else:
-            print(f"  × 无法读取帧 {idx}")
+            print(f"   无法读取帧 {idx}")
     
     if frames:
         print(f"  - 最终帧尺寸: {frames[0].size}")
     
     cap.release()
-    print(f"\n✓ 成功提取了 {len(frames)} 帧")
+    print(f"\n 成功提取了 {len(frames)} 帧")
     return frames
 
 def create_sprite_sheet(frames, frame_size=None):
@@ -211,7 +146,7 @@ def create_sprite_sheet(frames, frame_size=None):
             frame = frame.convert('RGBA')
         sprite_sheet.paste(frame, (x_offset, 0))
     
-    print("✓ Sprite sheet 创建完成!")
+    print(" Sprite sheet 创建完成!")
     return sprite_sheet, frames
 
 def save_individual_frames(frames, output_dir="extracted_frames"):
@@ -223,7 +158,7 @@ def save_individual_frames(frames, output_dir="extracted_frames"):
         output_path = os.path.join(output_dir, f"frame_{i:03d}.png")
         frame.save(output_path)
     
-    print(f"✓ 保存了 {len(frames)} 个帧")
+    print(f" 保存了 {len(frames)} 个帧")
 
 def main():
     # 检查命令行参数
@@ -251,7 +186,7 @@ def main():
         frame_size = (size, size)
     
     if not os.path.exists(video_path):
-        print(f"× 错误: 找不到视频文件 {video_path}")
+        print(f" 错误: 找不到视频文件 {video_path}")
         sys.exit(1)
      
     try:
@@ -259,7 +194,7 @@ def main():
         frames = extract_frames_from_video_segment(video_path, start_time, end_time)
         
         if not frames:
-            print("× 错误: 没有提取到任何帧")
+            print(" 错误: 没有提取到任何帧")
             sys.exit(1)
         
         # 2. 创建 sprite sheet
@@ -268,13 +203,13 @@ def main():
         # 3. 保存结果
         sprite_sheet_path = "extracted_sprite_sheet.png"
         sprite_sheet.save(sprite_sheet_path)
-        print(f"\n✓ Sprite sheet 已保存: {sprite_sheet_path}")
+        print(f"\n Sprite sheet 已保存: {sprite_sheet_path}")
         
         # 4. 保存单独的帧
         save_individual_frames(output_frames, output_dir="extracted_frames")
         
         print("\n" + "="*60)
-        print("完成! 生成的文件:")
+        print("完成")
         print(f"  - Sprite sheet: {sprite_sheet_path}")
         print(f"  - 单独帧: extracted_frames/frame_*.png")
         print(f"  - 提取时间: {start_time}s - {end_time}s")
@@ -282,7 +217,7 @@ def main():
         print("="*60)
         
     except Exception as e:
-        print(f"\n× 错误: {e}")
+        print(f"\n 错误: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
