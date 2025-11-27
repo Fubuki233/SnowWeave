@@ -1,16 +1,3 @@
-"""
-Sprite动画生成流水线 - Gradio Web界面
-Sprite Animation Generation Pipeline - Gradio Web Interface
-提供可视化操作界面
-Provide visual operation interface
-
-运行方法 / Usage:
-    python gradio_app.py
-    
-然后在浏览器打开显示的URL
-Then open the displayed URL in your browser
-"""
-
 import gradio as gr
 import os
 import sys
