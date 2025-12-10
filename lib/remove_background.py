@@ -18,7 +18,7 @@ from multiprocessing import Pool, cpu_count
 
 def detect_background_color(image):
     """
-    自动检测背景颜色（取四角平均值）
+    自动检测背景颜色（取四角平均值，带异常值过滤）
     
     参数:
         image: PIL Image对象
@@ -38,12 +38,29 @@ def detect_background_color(image):
         img_array[h-corner_size:h, w-corner_size:w],                # 右下
     ]
     
-    # 计算平均颜色
+    # 计算每个角的平均颜色
+    corner_colors = [np.mean(corner.reshape(-1, 3), axis=0) for corner in corners]
+    
+    # 计算所有角颜色的中位数（更鲁棒，避免异常值影响）
     all_pixels = np.concatenate([corner.reshape(-1, 3) for corner in corners])
-    bg_color = tuple(np.mean(all_pixels, axis=0).astype(int))
+    bg_color = tuple(np.median(all_pixels, axis=0).astype(int))
     
     print(f"检测到背景色: RGB{bg_color}")
     return bg_color
+
+
+def is_white_background(bg_color, threshold=230):
+    """
+    检测是否为白色/浅色背景
+    
+    参数:
+        bg_color: 背景色 (R, G, B)
+        threshold: 白色判定阈值
+    
+    返回:
+        bool
+    """
+    return all(c >= threshold for c in bg_color)
 
 def color_distance(color1, color2):
     """计算两个颜色的欧氏距离"""
@@ -103,7 +120,7 @@ def detect_and_remove_black_borders(image, black_threshold=30):
 
 def remove_background(image, bg_color, tolerance=30):
     """
-    简化的背景移除：直接检测并删除指定颜色
+    智能背景移除：针对白色背景优化
     
     参数:
         image: PIL Image对象
@@ -113,26 +130,123 @@ def remove_background(image, bg_color, tolerance=30):
     返回:
         带透明通道的PIL Image对象
     """
-    print(f"开始移除背景 (容差: {tolerance})...")
-    
-    img_array = np.array(image.convert('RGB'))
+    img_array = np.array(image.convert('RGB')).astype(np.float32)
     h, w = img_array.shape[:2]
     
     # 创建alpha通道
     alpha = np.ones((h, w), dtype=np.uint8) * 255
     
-    # 计算每个像素与背景色的距离
-    distances = np.sqrt(np.sum((img_array - bg_color) ** 2, axis=2))
+    # 检测是否为白色背景
+    white_bg = is_white_background(bg_color)
+    
+    if white_bg:
+        print(f"检测到白色背景，使用优化算法 (容差: {tolerance})...")
+        
+        # 白色背景优化策略:
+        # 1. 计算像素亮度 (V 值)
+        # 2. 计算像素饱和度 (S 值) - 白色背景饱和度低
+        # 3. 综合判断
+        
+        # 计算亮度 (取最大RGB值作为V)
+        brightness = np.max(img_array, axis=2)
+        
+        # 计算饱和度: S = (max - min) / max
+        max_rgb = np.max(img_array, axis=2)
+        min_rgb = np.min(img_array, axis=2)
+        # 避免除零
+        saturation = np.where(max_rgb > 0, (max_rgb - min_rgb) / max_rgb, 0)
+        
+        # 白色背景特征: 高亮度 + 低饱和度
+        # 容差越大，允许的饱和度越高
+        brightness_threshold = 255 - tolerance  # 容差30 -> 亮度阈值225
+        saturation_threshold = tolerance / 255.0 * 1.5  # 容差30 -> 饱和度阈值约0.18
+        
+        # 背景掩码: 高亮度且低饱和度
+        mask = (brightness >= brightness_threshold) & (saturation <= saturation_threshold)
+        
+        # 边缘优化: 使用颜色距离作为补充判断
+        bg_array = np.array(bg_color, dtype=np.float32)
+        distances = np.sqrt(np.sum((img_array - bg_array) ** 2, axis=2))
+        color_mask = distances <= tolerance * 1.5
+        
+        # 合并两种掩码 (取并集，确保白色区域都被移除)
+        mask = mask | color_mask
+        
+    else:
+        print(f"开始移除背景 (容差: {tolerance})...")
+        # 非白色背景: 使用传统颜色距离方法
+        bg_array = np.array(bg_color, dtype=np.float32)
+        distances = np.sqrt(np.sum((img_array - bg_array) ** 2, axis=2))
+        mask = distances <= tolerance
     
     # 标记背景像素为透明
-    mask = distances <= tolerance
     alpha[mask] = 0
     
     removed_count = np.sum(mask)
     print(f"✓ 移除背景像素: {removed_count} ({removed_count/(h*w)*100:.1f}%)")
     
     # 合并RGB和Alpha
-    result = np.dstack((img_array, alpha))
+    result = np.dstack((img_array.astype(np.uint8), alpha))
+    result_image = Image.fromarray(result, 'RGBA')
+    
+    # 对白色背景应用边缘羽化，消除白边
+    if white_bg:
+        result_image = refine_edges(result_image, bg_color, feather_radius=1)
+    
+    return result_image
+
+
+def refine_edges(image, bg_color, feather_radius=1):
+    """
+    边缘精细化处理：消除白边/杂边 (向量化实现)
+    
+    参数:
+        image: PIL Image对象 (RGBA)
+        bg_color: 背景色 (R, G, B)
+        feather_radius: 羽化半径
+    
+    返回:
+        处理后的PIL Image对象
+    """
+    try:
+        from scipy import ndimage
+    except ImportError:
+        print("⚠ scipy未安装，跳过边缘精细化")
+        return image
+    
+    img_array = np.array(image)
+    alpha = img_array[:, :, 3].astype(np.float32)
+    rgb = img_array[:, :, :3].astype(np.float32)
+    
+    # 找到边缘像素 (alpha从0到255的过渡区)
+    # 膨胀操作找到边缘外围
+    alpha_binary = alpha > 0
+    dilated = ndimage.binary_dilation(alpha_binary, iterations=feather_radius + 1)
+    eroded = ndimage.binary_erosion(alpha_binary, iterations=max(1, feather_radius))
+    edge_mask = dilated & ~eroded
+    
+    # 对边缘像素检查是否接近背景色 (向量化)
+    bg_array = np.array(bg_color, dtype=np.float32)
+    
+    # 计算所有像素与背景色的距离
+    distances = np.sqrt(np.sum((rgb - bg_array) ** 2, axis=2))
+    
+    # 对边缘区域中接近背景色的像素调整透明度
+    # 距离阈值: 越接近背景色，透明度越低
+    edge_threshold = 60
+    adjustment_mask = edge_mask & (alpha > 0) & (distances < edge_threshold)
+    
+    # 根据距离计算新的透明度
+    # 距离为0时透明度为0，距离为threshold时保持原透明度
+    alpha_factor = np.clip(distances / edge_threshold, 0, 1)
+    alpha[adjustment_mask] = alpha[adjustment_mask] * alpha_factor[adjustment_mask]
+    
+    adjusted_count = np.sum(adjustment_mask)
+    if adjusted_count > 0:
+        print(f"  边缘精细化: 调整了 {adjusted_count} 个边缘像素")
+    
+    # 合并结果
+    result = np.dstack((rgb.astype(np.uint8), alpha.astype(np.uint8)))
     return Image.fromarray(result, 'RGBA')
 
 def auto_crop_transparent(image, padding=0):

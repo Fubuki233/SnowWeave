@@ -1,0 +1,33 @@
+=== Plant Stage Generation / 植物阶段生成 ===
+
+Plant ID / 植物ID: strawberry
+Generation Time / 生成时间: 20251207_181204
+Total Stages / 总阶段数: 4
+Total Animations / 总动画数: 8
+Total Frames / 总帧数: 192
+Target Width / 目标宽度: 256px
+Base Prompt / 基础提示词: strawberry
+
+=== Stage Results / 阶段结果 ===
+Stage 1: OK
+  Transition frames: 24
+  Idle frames: 24
+  Total: 48 frames
+Stage 2: OK
+  Transition frames: 24
+  Idle frames: 24
+  Total: 48 frames
+Stage 3: OK
+  Transition frames: 24
+  Idle frames: 24
+  Total: 48 frames
+Stage 4: OK
+  Transition frames: 24
+  Idle frames: 24
+  Total: 48 frames
+
+=== All Videos / 所有视频 ===
+  D:\SnowGlobe\SnowWeave\gradio_outputs\plant_strawberry_20251207_181204\videos\strawberry_stage1.mp4
+  D:\SnowGlobe\SnowWeave\gradio_outputs\plant_strawberry_20251207_181204\videos\strawberry_stage3.mp4
+  D:\SnowGlobe\SnowWeave\gradio_outputs\plant_strawberry_20251207_181204\videos\strawberry_stage4.mp4
+  D:\SnowGlobe\SnowWeave\gradio_outputs\plant_strawberry_20251207_181204\videos\strawberry_stage2.mp4

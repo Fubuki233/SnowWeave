@@ -27,6 +27,81 @@ def apply_crop(image, left, right):
     h, w = image.size[1], image.size[0]
     return image.crop((left, 0, right, h))
 
+
+def scale_and_expand_frame(frame, target_width, target_height):
+    """
+    将帧等比缩放到目标宽度，然后扩展到目标高度（底部对齐，顶部填充透明）
+    
+    Args:
+        frame: PIL Image 帧
+        target_width: 目标宽度（原始输入图片的宽度）
+        target_height: 目标高度（原始输入图片的高度）
+    
+    Returns:
+        处理后的 PIL Image
+    """
+    frame_width, frame_height = frame.size
+    
+    # 如果尺寸已经匹配，直接返回
+    if frame_width == target_width and frame_height == target_height:
+        return frame
+    
+    # 第一步：等比缩放宽度
+    if frame_width != target_width:
+        scale_ratio = target_width / frame_width
+        new_height = int(frame_height * scale_ratio)
+        frame = frame.resize((target_width, new_height), Image.Resampling.LANCZOS)
+        frame_width, frame_height = frame.size
+        print(f"    [缩放] {frame_width}x{frame_height} (比例: {scale_ratio:.3f})")
+    
+    # 第二步：如果高度小于目标高度，扩展高度（底部对齐，顶部白色）
+    if frame_height < target_height:
+        # 确保是 RGBA 模式
+        if frame.mode != 'RGBA':
+            frame = frame.convert('RGBA')
+        
+        # 创建白色不透明画布
+        expanded = Image.new('RGBA', (target_width, target_height), (255, 255, 255, 255))
+        # 将帧粘贴到底部
+        paste_y = target_height - frame_height
+        expanded.paste(frame, (0, paste_y))
+        frame = expanded
+        print(f"    [扩展] -> {target_width}x{target_height} (顶部填充 {paste_y}px 白色)")
+    elif frame_height > target_height:
+        # 如果高度超过目标，从底部裁剪
+        crop_top = frame_height - target_height
+        frame = frame.crop((0, crop_top, target_width, frame_height))
+        print(f"    [裁剪] 从顶部裁剪 {crop_top}px -> {target_width}x{target_height}")
+    
+    return frame
+
+
+def process_frames_to_target_size(frames, target_width, target_height):
+    """
+    批量处理帧：等比缩放到目标宽度，再扩展/裁剪到目标高度
+    
+    Args:
+        frames: PIL Image 列表
+        target_width: 目标宽度
+        target_height: 目标高度
+    
+    Returns:
+        处理后的帧列表
+    """
+    if not frames:
+        return frames
+    
+    original_size = frames[0].size
+    print(f"  [处理帧尺寸] 原始: {original_size[0]}x{original_size[1]} -> 目标: {target_width}x{target_height}")
+    
+    processed_frames = []
+    for i, frame in enumerate(frames):
+        processed = scale_and_expand_frame(frame, target_width, target_height)
+        processed_frames.append(processed)
+    
+    print(f"  [处理完成] {len(processed_frames)} 帧已调整到 {target_width}x{target_height}")
+    return processed_frames
+
 def extract_frames_from_video_segment(video_path, start_time=0.0, end_time=1.0, max_frames=0):
     print(f"正在处理视频: {video_path}")
     
@@ -45,13 +120,19 @@ def extract_frames_from_video_segment(video_path, start_time=0.0, end_time=1.0, 
     print(f"  - 总帧数: {total_frames}")
     print(f"  - 时长: {duration:.2f} 秒")
     
-    # 判断是否解析整个视频
-    parse_full_video = (start_time == 0 and end_time == 0) or start_time == -1 or end_time == -1
-    
-    if parse_full_video:
-        start_time = 0
+    # 判断是否使用视频结尾作为结束时间
+    # end_time=0 或 end_time=-1 表示使用视频结尾
+    if end_time <= 0 or end_time == -1:
         end_time = duration
-        print(f"  - 模式: 解析整个视频")
+        print(f"  - 模式: 使用视频结尾作为结束时间")
+    
+    # 判断是否使用视频开头作为开始时间
+    if start_time < 0 or start_time == -1:
+        start_time = 0
+        print(f"  - 模式: 使用视频开头作为开始时间")
+    
+    # 确保 end_time 不超过视频时长
+    end_time = min(end_time, duration)
     
     start_frame = int(start_time * fps)
     end_frame = int(end_time * fps)
@@ -78,6 +159,12 @@ def extract_frames_from_video_segment(video_path, start_time=0.0, end_time=1.0, 
     
     frame_indices = list(range(start_frame, end_frame, frame_interval))[:actual_max_frames]
     print(f"将提取 {len(frame_indices)} 帧")
+    
+    # 检查是否有可提取的帧
+    if not frame_indices:
+        cap.release()
+        print(f"  [WARNING] 没有可提取的帧!")
+        return []
     
     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_indices[0])
     ret, first_frame = cap.read()

@@ -1,0 +1,65 @@
+{
+  "item_id": "strawberry",
+  "display_name": "Strawberry",
+  "description": "strawberry",
+  "preset_type": "plant",
+  "growth_stages": 4,
+  "animations_per_stage": 2,
+  "total_animations": 8,
+  "texture_directory": "D:/SnowGlobe/SnowWeave/gradio_outputs/plant_strawberry_20251207_181204/final_frames",
+  "animations": {
+    "stage1_transition": {
+      "frames": 24,
+      "loop": false,
+      "description": "Stage 1 transition animation"
+    },
+    "stage1_idle": {
+      "frames": 24,
+      "loop": true,
+      "description": "Stage 1 idle animation"
+    },
+    "stage2_transition": {
+      "frames": 24,
+      "loop": false,
+      "description": "Stage 2 transition animation"
+    },
+    "stage2_idle": {
+      "frames": 24,
+      "loop": true,
+      "description": "Stage 2 idle animation"
+    },
+    "stage3_transition": {
+      "frames": 24,
+      "loop": false,
+      "description": "Stage 3 transition animation"
+    },
+    "stage3_idle": {
+      "frames": 24,
+      "loop": true,
+      "description": "Stage 3 idle animation"
+    },
+    "stage4_transition": {
+      "frames": 24,
+      "loop": false,
+      "description": "Stage 4 transition animation"
+    },
+    "stage4_idle": {
+      "frames": 24,
+      "loop": true,
+      "description": "Stage 4 idle animation"
+    }
+  },
+  "naming_format": {
+    "transition": "{plant_id}-stage{X}-transition-frame{Y}.png",
+    "idle": "{plant_id}-stage{X}-idle-frame{Y}.png"
+  },
+  "parameters": {
+    "plant_type": "草",
+    "lifespan": 100.0,
+    "has_fruit": false
+  },
+  "collision": {
+    "enabled": true,
+    "type": "circle"
+  }
+}
