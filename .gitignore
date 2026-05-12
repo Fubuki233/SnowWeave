@@ -1,0 +1,11 @@
+# Output directories
+out/
+outputs/
+api_outputs/
+map_outputs/
+gradio_outputs/
+
+# Python cache
+__pycache__/
+*.pyc
+
