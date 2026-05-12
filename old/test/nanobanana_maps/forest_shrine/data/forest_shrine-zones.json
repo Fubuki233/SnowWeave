@@ -1,0 +1,25 @@
+{
+  "zones": {
+    "encounter_grass": {
+      "type": "rect",
+      "x": 82,
+      "y": 422,
+      "w": 256,
+      "h": 169
+    },
+    "rest": {
+      "type": "circle",
+      "x": 594,
+      "y": 323,
+      "radius": 61
+    },
+    "exit_east": {
+      "type": "rect",
+      "x": 942,
+      "y": 323,
+      "w": 61,
+      "h": 138,
+      "target": "next_map"
+    }
+  }
+}

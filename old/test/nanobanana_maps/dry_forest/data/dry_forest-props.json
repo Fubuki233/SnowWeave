@@ -1,0 +1,72 @@
+{
+  "props": [
+    {
+      "id": "oak_tree",
+      "image": "assets/props/oak_tree.png",
+      "x": 184,
+      "y": 261,
+      "w": 240,
+      "h": 280,
+      "sortY": 261,
+      "layer": "props",
+      "anchor": "center-bottom"
+    },
+    {
+      "id": "pine_tree",
+      "image": "assets/props/pine_tree.png",
+      "x": 338,
+      "y": 184,
+      "w": 180,
+      "h": 300,
+      "sortY": 184,
+      "layer": "props",
+      "anchor": "center-bottom"
+    },
+    {
+      "id": "stone_lantern",
+      "image": "assets/props/stone_lantern.png",
+      "x": 717,
+      "y": 215,
+      "w": 110,
+      "h": 150,
+      "sortY": 215,
+      "layer": "props",
+      "anchor": "center-bottom"
+    },
+    {
+      "id": "boulder",
+      "image": "assets/props/boulder.png",
+      "x": 840,
+      "y": 415,
+      "w": 150,
+      "h": 120,
+      "sortY": 415,
+      "layer": "props",
+      "anchor": "center-bottom"
+    },
+    {
+      "id": "wooden_sign",
+      "image": "assets/props/wooden_sign.png",
+      "x": 256,
+      "y": 538,
+      "w": 100,
+      "h": 130,
+      "sortY": 538,
+      "layer": "props",
+      "anchor": "center-bottom"
+    }
+  ],
+  "foreground": [
+    {
+      "id": "shrine_roof_canopy",
+      "image": "assets/props/shrine_roof_canopy.png",
+      "x": 614,
+      "y": 553,
+      "w": 300,
+      "h": 180,
+      "sortY": 553,
+      "layer": "foreground",
+      "anchor": "center-bottom"
+    }
+  ]
+}

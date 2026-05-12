@@ -1,0 +1,29 @@
+{
+  "version": "1.0",
+  "pipeline": "layered_raster + y_sorted_props + foreground + precise_shapes + trigger_zones",
+  "model": "gemini-3.1-flash-image-preview",
+  "brief": "small forest shrine map with winding dirt path",
+  "size": {
+    "width": 1024,
+    "height": 768
+  },
+  "assets": {
+    "base": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\dry_forest\\assets\\map\\dry_forest-base.png",
+    "dressed_reference": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\dry_forest\\assets\\map\\dry_forest-dressed-reference.png",
+    "layered_preview": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\dry_forest\\assets\\map\\dry_forest-layered-preview.png",
+    "props_dir": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\dry_forest\\assets\\props"
+  },
+  "data": {
+    "props": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\dry_forest\\data\\dry_forest-props.json",
+    "collision": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\dry_forest\\data\\dry_forest-collision.json",
+    "zones": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\dry_forest\\data\\dry_forest-zones.json"
+  },
+  "render_order": [
+    "base",
+    "props sorted by sortY",
+    "actors sorted by sortY at runtime",
+    "foreground",
+    "debug collision",
+    "HUD/UI"
+  ]
+}

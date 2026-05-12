@@ -1,0 +1,62 @@
+{
+  "mapSize": {
+    "width": 1024,
+    "height": 768
+  },
+  "spawn": {
+    "x": 512,
+    "y": 599
+  },
+  "walkBounds": [
+    {
+      "id": "main-walkable",
+      "type": "ellipse",
+      "x": 512,
+      "y": 422,
+      "rx": 430,
+      "ry": 261
+    }
+  ],
+  "blockers": [
+    {
+      "id": "oak_tree-base",
+      "type": "ellipse",
+      "x": 184,
+      "y": 233.0,
+      "rx": 53,
+      "ry": 28
+    },
+    {
+      "id": "pine_tree-base",
+      "type": "ellipse",
+      "x": 338,
+      "y": 154.0,
+      "rx": 40,
+      "ry": 30
+    },
+    {
+      "id": "stone_lantern-base",
+      "type": "rect",
+      "x": 697,
+      "y": 182,
+      "w": 40,
+      "h": 33
+    },
+    {
+      "id": "boulder-base",
+      "type": "ellipse",
+      "x": 840,
+      "y": 403.0,
+      "rx": 33,
+      "ry": 12
+    },
+    {
+      "id": "wooden_sign-base",
+      "type": "rect",
+      "x": 238,
+      "y": 509,
+      "w": 36,
+      "h": 29
+    }
+  ]
+}

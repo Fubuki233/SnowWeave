@@ -1,0 +1,9 @@
+Create a clean hand-painted top-down 2D RPG game map, 1024x768.
+This is a BASE GROUND MAP ONLY for a layered raster exploration scene.
+Map brief: small playable top-down RPG forest shrine clearing with winding dirt path, shallow pond edge, soft grass encounter area, rest point near shrine stones, east exit path, clear walkable routes
+Style: clean HD hand-painted top-down 2D RPG game asset style, sharp readable terrain shapes, crisp silhouettes, smooth painted surfaces, low texture noise.
+Include terrain, paths, grass, floor materials, low ground markings, and flat anchor pads.
+Do not include tall collidable objects: no buildings, gates, fences, lanterns, trees, signs, barrels, NPCs, monsters, UI, labels, or text.
+Leave clear empty spaces where props will be placed later.
+Make walkable paths and zone boundaries easy to trace.
+No border frame, no watermark.

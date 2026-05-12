@@ -1,0 +1,29 @@
+{
+  "version": "1.0",
+  "pipeline": "layered_raster + y_sorted_props + foreground + precise_shapes + trigger_zones",
+  "model": "gemini-3.1-flash-image-preview",
+  "brief": "small forest shrine map with winding dirt path and pond",
+  "size": {
+    "width": 1024,
+    "height": 768
+  },
+  "assets": {
+    "base": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\forest_shrine\\assets\\map\\forest_shrine-base.png",
+    "dressed_reference": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\forest_shrine\\assets\\map\\forest_shrine-dressed-reference.png",
+    "layered_preview": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\forest_shrine\\assets\\map\\forest_shrine-layered-preview.png",
+    "props_dir": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\forest_shrine\\assets\\props"
+  },
+  "data": {
+    "props": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\forest_shrine\\data\\forest_shrine-props.json",
+    "collision": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\forest_shrine\\data\\forest_shrine-collision.json",
+    "zones": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\forest_shrine\\data\\forest_shrine-zones.json"
+  },
+  "render_order": [
+    "base",
+    "props sorted by sortY",
+    "actors sorted by sortY at runtime",
+    "foreground",
+    "debug collision",
+    "HUD/UI"
+  ]
+}

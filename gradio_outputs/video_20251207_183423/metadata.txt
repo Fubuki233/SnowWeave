@@ -1,5 +1,0 @@
-Generation Time / 生成时间: 20251207_183423
-Action Description / 动作描述: walking animation, side view, loop
-Model Used / 使用模型: doubao-seedance-1-0-pro-fast-251015
-Video File / 视频文件: animation.mp4
-Reference Image / 参考图片: reference_image.png

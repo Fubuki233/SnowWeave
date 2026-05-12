@@ -1,0 +1,9 @@
+Use the provided image as the exact base map reference.
+Create a dressed-reference version of the same top-down RPG map, 1024x768, by adding props only.
+Preserve exactly: camera, framing, image size, terrain, paths, map boundaries, and all walkable routes.
+Do not crop, zoom, rotate, repaint, or redesign the terrain.
+Map brief: small forest shrine map with winding dirt path and pond
+Add these props naturally on top of the existing map: oak_tree: large oak tree with rounded canopy and visible trunk base, pine_tree: tall pine tree with dark green triangular foliage and trunk, stone_lantern: small mossy stone lantern shrine prop, boulder: rounded mossy grey boulder, wooden_sign: small wooden sign post, shrine_roof_canopy: small red shrine roof overhang foreground occluder.
+Props should feel intentionally placed along paths, landmarks, encounter-zone edges, rest points, and entrances.
+This is a planning reference only, not final runtime art.
+No UI, no text, no labels, no watermark. Style: clean HD hand-painted top-down 2D RPG game asset style.

@@ -1,0 +1,29 @@
+{
+  "version": "1.0",
+  "pipeline": "layered_raster + y_sorted_props + foreground + precise_shapes + trigger_zones",
+  "model": "gemini-3.1-flash-image-preview",
+  "brief": "small forest shrine",
+  "size": {
+    "width": 1024,
+    "height": 768
+  },
+  "assets": {
+    "base": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\dry_check\\assets\\map\\dry_check-base.png",
+    "dressed_reference": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\dry_check\\assets\\map\\dry_check-dressed-reference.png",
+    "layered_preview": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\dry_check\\assets\\map\\dry_check-layered-preview.png",
+    "props_dir": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\dry_check\\assets\\props"
+  },
+  "data": {
+    "props": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\dry_check\\data\\dry_check-props.json",
+    "collision": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\dry_check\\data\\dry_check-collision.json",
+    "zones": "D:\\SnowGlobe\\SnowWeave\\test\\nanobanana_maps\\dry_check\\data\\dry_check-zones.json"
+  },
+  "render_order": [
+    "base",
+    "props sorted by sortY",
+    "actors sorted by sortY at runtime",
+    "foreground",
+    "debug collision",
+    "HUD/UI"
+  ]
+}

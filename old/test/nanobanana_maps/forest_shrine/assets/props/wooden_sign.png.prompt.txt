@@ -1,0 +1,7 @@
+Create a single small wooden sign post as a transparent-game-ready top-down 2D RPG map prop.
+Style: clean HD hand-painted top-down 2D RPG game asset style, matching clean hand-painted RPG map assets.
+Mostly front-facing top-down RPG object view: upright objects are vertical and centered, with only a small visible top face.
+Full object visible, centered, crisp but not chunky outlines.
+Background must be 100% solid flat #FF00FF magenta, no gradients, no texture, no shadows, no floor plane.
+No text, labels, UI, or watermark.
+Entire prop must fit fully inside the image with generous magenta margin on all sides.
