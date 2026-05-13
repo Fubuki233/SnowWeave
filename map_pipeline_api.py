@@ -11,6 +11,7 @@ import base64
 import json
 import mimetypes
 import os
+import subprocess
 import sys
 import threading
 import uuid
@@ -27,7 +28,11 @@ DEPENDENCIES_ROOT = SNOWWEAVE_ROOT / "dependencies"
 ASF_SCRIPTS = DEPENDENCIES_ROOT / "agent-sprite-forge" / "scripts"
 GODOT_PROJECT = Path(r"D:\SnowGlobe\SnowGlobe\snow-globe")
 DEFAULT_OUT = SNOWWEAVE_ROOT / "out" / "maps"
+FMG_REF_ROOT = SNOWWEAVE_ROOT / "out" / "fmg_refs"
+SNOWWEAVE_SCRIPTS = SNOWWEAVE_ROOT / "scripts"
 API_KEY_ENV_NAMES = ("OPENROUTER_API_KEY", "NAGA_API_KEY", "OPENAI_API_KEY")
+DEFAULT_FMG_BACKEND_URL = "http://127.0.0.1:8765"
+DEFAULT_FMG_CHUNK_SIZE = 4096
 
 sys.path.insert(0, str(ASF_SCRIPTS))
 import asf  # type: ignore  # noqa: E402
@@ -98,9 +103,11 @@ def _path_values(result: dict[str, Any]) -> list[Path]:
         result.get("dressed_image"),
         result.get("preview_image"),
         result.get("preview_annotated_image"),
+        result.get("prop_alpha_overlay_image"),
         result.get("placements_json"),
         result.get("prop_manifest_json"),
         result.get("preview_report"),
+        result.get("prop_alpha_overlay_report"),
     ]
     for prop in result.get("props", []):
         if isinstance(prop, dict):
@@ -152,12 +159,74 @@ def _api_key_from_environment() -> str | None:
     return None
 
 
+def _run_json_script(args: list[str]) -> dict[str, Any]:
+    completed = subprocess.run(
+        [sys.executable, *args],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return json.loads(completed.stdout)
+
+
+def _prepare_fmg_reference(
+    *,
+    output_dir: Path,
+    seed: str | None,
+    chunk_id: str,
+    chunk_size: int,
+    backend_url: str,
+    bundle_zip: str | None,
+) -> dict[str, Any]:
+    if chunk_size != DEFAULT_FMG_CHUNK_SIZE:
+        raise ValueError("FMG SnowWeave integration requires fixed 4096px chunks.")
+
+    ref_dir = output_dir / "fmg-reference"
+    script = SNOWWEAVE_SCRIPTS / "fmg_unpack_atlas_bundle.py"
+    command = [
+        str(script),
+        "--output-dir", str(ref_dir),
+        "--chunk-size", str(chunk_size),
+        "--backend-url", backend_url,
+        "--force",
+    ]
+    if seed:
+        command.extend(["--seed", seed])
+    if bundle_zip:
+        command.extend(["--zip", bundle_zip])
+
+    index = _run_json_script(command)
+    chunks = index.get("chunks")
+    if not isinstance(chunks, dict) or chunk_id not in chunks:
+        raise ValueError(f"FMG chunk not found: {chunk_id}")
+    chunk = chunks[chunk_id]
+    if not isinstance(chunk, dict):
+        raise ValueError(f"Invalid FMG chunk entry: {chunk_id}")
+
+    return {
+        "index_path": str((ref_dir / "fmg_reference_index.json").resolve()),
+        "index": index,
+        "chunk_id": chunk_id,
+        "chunk": chunk,
+        "image_path": str(chunk["png"]),
+        "legend_context": str(chunk.get("legend_context") or ""),
+    }
+
+
 def _run_pipeline(
     task_id: str,
     *,
     prompt: str,
     output_dir: Path,
-    image_path: str | None,
+    image_paths: list[str],
+    prompt_context: str,
+    reference_metadata: dict[str, Any],
+    use_fmg_reference: bool,
+    fmg_seed: str | None,
+    fmg_chunk_id: str,
+    fmg_chunk_size: int,
+    fmg_backend_url: str,
+    fmg_bundle_zip: str | None,
     model: str,
     diff: float,
     min_area: int,
@@ -180,10 +249,40 @@ def _run_pipeline(
             progress=5,
             message="Generating map bundle with ASF",
         )
+        effective_image_paths = list(image_paths)
+        effective_prompt_context = prompt_context
+        effective_reference_metadata = dict(reference_metadata)
+        if use_fmg_reference:
+            _emit(
+                task_id,
+                "fmg_reference",
+                status="running",
+                progress=8,
+                message=f"Preparing FMG chunk reference {fmg_chunk_id}",
+            )
+            fmg_reference = _prepare_fmg_reference(
+                output_dir=output_dir,
+                seed=fmg_seed,
+                chunk_id=fmg_chunk_id,
+                chunk_size=fmg_chunk_size,
+                backend_url=fmg_backend_url,
+                bundle_zip=fmg_bundle_zip,
+            )
+            effective_image_paths = [fmg_reference["image_path"], *effective_image_paths]
+            contexts = [effective_prompt_context, fmg_reference["legend_context"]]
+            effective_prompt_context = "\n\n".join(context for context in contexts if context.strip())
+            effective_reference_metadata["fmg_reference"] = {
+                "index_path": fmg_reference["index_path"],
+                "chunk_id": fmg_reference["chunk_id"],
+                "chunk": fmg_reference["chunk"],
+            }
+
         result = asf.generate_map_pipeline(
             prompt=prompt,
             output_dir=output_dir,
-            image_path=image_path,
+            image_paths=effective_image_paths,
+            prompt_context=effective_prompt_context,
+            reference_metadata=effective_reference_metadata,
             model=model,
             map_mode=map_mode,
             api_key=_api_key_from_environment(),
@@ -234,7 +333,8 @@ def generate(payload: dict[str, Any]) -> dict[str, Any]:
     image_path = payload.get("image")
     if image_path and not Path(str(image_path)).exists():
         raise HTTPException(400, f"Image not found: {image_path}")
-    if not prompt and not image_path:
+    use_fmg_reference = bool(payload.get("use_fmg_reference", False))
+    if not prompt and not image_path and not use_fmg_reference:
         raise HTTPException(400, "Need prompt or image")
 
     task_id = _task_id()
@@ -257,9 +357,17 @@ def generate(payload: dict[str, Any]) -> dict[str, Any]:
             "task_id": task_id,
             "prompt": prompt,
             "output_dir": output_dir,
-            "image_path": str(image_path) if image_path else None,
+            "image_paths": [str(image_path)] if image_path else [],
+            "prompt_context": str(payload.get("prompt_context") or ""),
+            "reference_metadata": {},
+            "use_fmg_reference": use_fmg_reference,
+            "fmg_seed": str(payload.get("fmg_seed") or "").strip() or None,
+            "fmg_chunk_id": str(payload.get("fmg_chunk_id") or "chunk_0_0"),
+            "fmg_chunk_size": int(payload.get("fmg_chunk_size") or DEFAULT_FMG_CHUNK_SIZE),
+            "fmg_backend_url": str(payload.get("fmg_backend_url") or DEFAULT_FMG_BACKEND_URL),
+            "fmg_bundle_zip": str(payload.get("fmg_bundle_zip") or "").strip() or None,
             "model": str(payload.get("model") or "gemini3.1flash"),
-            "diff": float(payload.get("sub_diff_threshold", 15)),
+            "diff": float(payload.get("sub_diff_threshold", 30)),
             "min_area": int(payload.get("sub_min_component_area", 100)),
             "map_mode": str(payload.get("map_mode") or "auto"),
             "no_shadow_suppression": bool(payload.get("sub_no_shadow_suppression", False)),
